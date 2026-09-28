@@ -1,13 +1,13 @@
 {
   "schemaVersion": 3,
-  "stateRevision": 81,
+  "stateRevision": 83,
   "workspaceId": "01a596320c9cf3ce382d902a",
   "phase": "complete",
   "currentSkill": null,
   "failureStreak": 0,
   "substantial": true,
-  "mutationGeneration": 113,
-  "verifiedGeneration": 113,
+  "mutationGeneration": 114,
+  "verifiedGeneration": 114,
   "activeCard": null,
   "lastDecision": null,
   "evidence": [
@@ -166,7 +166,19 @@
       "generation": 113,
       "timestamp": "2026-09-28T13:37:14.458Z",
       "workspaceId": "01a596320c9cf3ce382d902a"
+    },
+    {
+      "kind": "test",
+      "source": "cargo",
+      "result": "pass",
+      "detail": "all checks pass",
+      "repositoryRevision": "9e129170c19978925bc3a5eaa9744735e30d7a5d",
+      "commandCategory": "test",
+      "scope": "workspace",
+      "generation": 114,
+      "timestamp": "2026-09-28T13:37:39.335Z",
+      "workspaceId": "01a596320c9cf3ce382d902a"
     }
   ],
-  "updatedAt": "2026-09-28T13:37:14.458Z"
+  "updatedAt": "2026-09-28T13:37:39.335Z"
 }
