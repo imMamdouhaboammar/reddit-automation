@@ -3,6 +3,7 @@ pub mod actions;
 pub mod agents;
 pub mod audit;
 pub mod auth;
+pub mod cli;
 pub mod drivers;
 pub mod issues;
 pub mod mcp;

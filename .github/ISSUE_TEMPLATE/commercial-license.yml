@@ -1,0 +1,63 @@
+name: Commercial Licensing Inquiry
+description: Inquire about commercial licensing, OEM distribution, white-labeling, or hosted service rights
+title: "[Commercial License]: <Organization Name>"
+labels: ["commercial-license"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for your interest in commercial licensing for `reddit-agent`.
+        The public edition is released under Apache 2.0 with Commons Clause v1.0. Organizations wanting rights beyond the public source-available license can request a separate commercial agreement from the project owner.
+  - type: input
+    id: organization
+    attributes:
+      label: Organization / Company Name
+      description: What company or legal entity will be holding this license?
+      placeholder: "Acme Corp"
+    validations:
+      required: true
+  - type: input
+    id: website
+    attributes:
+      label: Company Website / Domain
+      placeholder: "https://example.com"
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Proposed Commercial Use Case
+      description: Describe your proposed product, service, distribution model, or integration.
+      placeholder: |
+        - Architecture overview
+        - Target audience or customer segment
+        - Will this be an OEM bundle, hosted managed service, white-label solution, or internal custom integration?
+    validations:
+      required: true
+  - type: dropdown
+    id: license-category
+    attributes:
+      label: Commercial License Category
+      options:
+        - "OEM / Bundled Redistribution (Proprietary software distribution)"
+        - "Hosted Managed Service / Multi-tenant SaaS"
+        - "White-Label Resale & Branding"
+        - "Commercial Redistribution of Modified Fork"
+        - "Enterprise Deployment & Custom Warranties"
+        - "Other"
+    validations:
+      required: true
+  - type: input
+    id: estimated-scale
+    attributes:
+      label: Estimated Scale / Deployment Volume
+      description: Number of seats, servers, or end users anticipated.
+      placeholder: "e.g., 50 managed accounts, 10 agent instances"
+    validations:
+      required: false
+  - type: checkboxes
+    attributes:
+      label: Confidentiality & Review
+      options:
+        - label: "I understand that this inquiry will be reviewed by the project owner and private follow-up communication will be established."
+          required: true

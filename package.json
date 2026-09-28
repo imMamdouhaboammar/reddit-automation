@@ -24,7 +24,7 @@
     "ai-agents"
   ],
   "author": "Mamdouh Aboammar",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
     "@types/node": "^22.13.9",
     "tsup": "^8.4.0",

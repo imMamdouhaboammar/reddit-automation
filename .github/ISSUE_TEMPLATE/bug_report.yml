@@ -1,0 +1,52 @@
+name: Bug Report
+description: Report a reproducible bug or unexpected behavior in reddit-agent
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue!
+        ⚠️ **SECURITY NOTICE:** NEVER include real Reddit refresh tokens, passwords, cookies, or client secrets in your report.
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what happened.
+      placeholder: "When running `reddit-agent accounts list`, the following error occurred..."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can maintainers reproduce this behavior?
+      placeholder: |
+        1. Run command '...'
+        2. Provide arguments '...'
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs or Output
+      description: Paste any sanitized error logs or stack traces (ensure secrets are redacted).
+      render: shell
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: Environment Info
+      description: Operating System, Rust version, and Chrome version.
+      placeholder: "macOS 15.1, Rust 1.84, Chrome 133"
+    validations:
+      required: true

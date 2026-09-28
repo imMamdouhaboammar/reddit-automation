@@ -2,7 +2,7 @@
 
 **System Version:** 0.0.1  
 **Author:** Mamdouh Aboammar  
-**License:** MIT  
+**License:** Source Available (Apache License 2.0 + Commons Clause Condition v1.0)  
 **Toolchain:** Bun · TypeScript · Commander · tsup · Vitest  
 
 $$\text{User Intent} \xrightarrow{\text{Commander CLI}} \text{Agentic Orchestration} \xrightarrow{\text{Policy \& Guardrails}} \text{Reddit API Client (Dry-Run by Default)} \xrightarrow{\text{Audit Log \& State}}$$

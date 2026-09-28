@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability Reporting
+    url: https://github.com/imMamdouhaboammar/reddit-agent/security/advisories/new
+    about: Please report security vulnerabilities privately via GitHub Security Advisories.
+  - name: Commercial Licensing Inquiries
+    url: https://github.com/imMamdouhaboammar/reddit-agent/issues/new?template=commercial-license.yml
+    about: Inquire about commercial licensing, OEM redistribution, or white-label agreements.

@@ -111,7 +111,8 @@ impl CommunityBuilderWorker {
                 promotional_count: 0,
                 value_percentage: 100.0,
                 is_compliant: true,
-                advisory: "No historical activity yet. Start with pure value-add posts.".to_string(),
+                advisory: "No historical activity yet. Start with pure value-add posts."
+                    .to_string(),
             };
         }
 
@@ -154,8 +155,26 @@ impl CommunityBuilderWorker {
         let mut neg = 0;
         let mut pain_points = Vec::new();
 
-        let negative_markers = ["frustrated", "hate", "broken", "terrible", "issue", "bug", "scam", "waste"];
-        let positive_markers = ["love", "awesome", "great", "helpful", "fixed", "best", "thanks", "recommend"];
+        let negative_markers = [
+            "frustrated",
+            "hate",
+            "broken",
+            "terrible",
+            "issue",
+            "bug",
+            "scam",
+            "waste",
+        ];
+        let positive_markers = [
+            "love",
+            "awesome",
+            "great",
+            "helpful",
+            "fixed",
+            "best",
+            "thanks",
+            "recommend",
+        ];
 
         for thread in threads {
             let text = format!("{} {}", thread.title, thread.body).to_lowercase();
@@ -208,17 +227,14 @@ impl CommunityBuilderWorker {
     }
 
     /// Plans an authentic AMA (Ask Me Anything) focused on subject matter expertise.
-    pub fn plan_ama(
-        subreddit: &str,
-        founder_role: &str,
-        domain_theme: &str,
-    ) -> ContentStrategy {
+    pub fn plan_ama(subreddit: &str, founder_role: &str, domain_theme: &str) -> ContentStrategy {
         ContentStrategy::AmaPlan {
             target_subreddit: subreddit.to_string(),
             host_role: founder_role.to_string(),
             core_theme: domain_theme.to_string(),
             anticipated_questions: vec![
-                "What made you build this and what was the hardest technical challenge?".to_string(),
+                "What made you build this and what was the hardest technical challenge?"
+                    .to_string(),
                 "How do you handle rate limits and platform integrity rules?".to_string(),
                 "What advice do you have for solo engineers starting in this space?".to_string(),
             ],
@@ -276,16 +292,76 @@ mod tests {
     #[test]
     fn test_audit_90_10_ratio_compliant() {
         let history = vec![
-            EngagementRecord { id: "1".to_string(), subreddit: "SaaS".to_string(), is_promotional: false, summary: "Helpful guide".to_string(), timestamp_utc: 1 },
-            EngagementRecord { id: "2".to_string(), subreddit: "SaaS".to_string(), is_promotional: false, summary: "Answer question".to_string(), timestamp_utc: 2 },
-            EngagementRecord { id: "3".to_string(), subreddit: "SaaS".to_string(), is_promotional: false, summary: "Free resource".to_string(), timestamp_utc: 3 },
-            EngagementRecord { id: "4".to_string(), subreddit: "SaaS".to_string(), is_promotional: false, summary: "Answer question".to_string(), timestamp_utc: 4 },
-            EngagementRecord { id: "5".to_string(), subreddit: "SaaS".to_string(), is_promotional: false, summary: "Answer question".to_string(), timestamp_utc: 5 },
-            EngagementRecord { id: "6".to_string(), subreddit: "SaaS".to_string(), is_promotional: false, summary: "Answer question".to_string(), timestamp_utc: 6 },
-            EngagementRecord { id: "7".to_string(), subreddit: "SaaS".to_string(), is_promotional: false, summary: "Answer question".to_string(), timestamp_utc: 7 },
-            EngagementRecord { id: "8".to_string(), subreddit: "SaaS".to_string(), is_promotional: false, summary: "Answer question".to_string(), timestamp_utc: 8 },
-            EngagementRecord { id: "9".to_string(), subreddit: "SaaS".to_string(), is_promotional: false, summary: "Answer question".to_string(), timestamp_utc: 9 },
-            EngagementRecord { id: "10".to_string(), subreddit: "SaaS".to_string(), is_promotional: true, summary: "Disclosed tool mention".to_string(), timestamp_utc: 10 },
+            EngagementRecord {
+                id: "1".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: false,
+                summary: "Helpful guide".to_string(),
+                timestamp_utc: 1,
+            },
+            EngagementRecord {
+                id: "2".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: false,
+                summary: "Answer question".to_string(),
+                timestamp_utc: 2,
+            },
+            EngagementRecord {
+                id: "3".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: false,
+                summary: "Free resource".to_string(),
+                timestamp_utc: 3,
+            },
+            EngagementRecord {
+                id: "4".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: false,
+                summary: "Answer question".to_string(),
+                timestamp_utc: 4,
+            },
+            EngagementRecord {
+                id: "5".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: false,
+                summary: "Answer question".to_string(),
+                timestamp_utc: 5,
+            },
+            EngagementRecord {
+                id: "6".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: false,
+                summary: "Answer question".to_string(),
+                timestamp_utc: 6,
+            },
+            EngagementRecord {
+                id: "7".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: false,
+                summary: "Answer question".to_string(),
+                timestamp_utc: 7,
+            },
+            EngagementRecord {
+                id: "8".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: false,
+                summary: "Answer question".to_string(),
+                timestamp_utc: 8,
+            },
+            EngagementRecord {
+                id: "9".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: false,
+                summary: "Answer question".to_string(),
+                timestamp_utc: 9,
+            },
+            EngagementRecord {
+                id: "10".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: true,
+                summary: "Disclosed tool mention".to_string(),
+                timestamp_utc: 10,
+            },
         ];
 
         let audit = CommunityBuilderWorker::audit_90_10_ratio(&history);
@@ -296,8 +372,20 @@ mod tests {
     #[test]
     fn test_audit_90_10_ratio_non_compliant() {
         let history = vec![
-            EngagementRecord { id: "1".to_string(), subreddit: "SaaS".to_string(), is_promotional: false, summary: "Answer".to_string(), timestamp_utc: 1 },
-            EngagementRecord { id: "2".to_string(), subreddit: "SaaS".to_string(), is_promotional: true, summary: "Promo".to_string(), timestamp_utc: 2 },
+            EngagementRecord {
+                id: "1".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: false,
+                summary: "Answer".to_string(),
+                timestamp_utc: 1,
+            },
+            EngagementRecord {
+                id: "2".to_string(),
+                subreddit: "SaaS".to_string(),
+                is_promotional: true,
+                summary: "Promo".to_string(),
+                timestamp_utc: 2,
+            },
         ];
 
         let audit = CommunityBuilderWorker::audit_90_10_ratio(&history);
