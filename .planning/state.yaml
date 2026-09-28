@@ -1,0 +1,61 @@
+version: "1.0.0"
+title: "Reddit Agentic Automation CLI Tool"
+goal: "Autonomous, safe, rate-limited Reddit automation CLI driven by AI agents"
+status: "WARMUP_COMPLETED"
+current_step: 1
+total_steps: 5
+mode: "DESIGN"
+
+quality_gates:
+  L0_anti_skip:
+    enabled: true
+    min_bytes: 100
+  L1_functional_verification:
+    enabled: true
+    target: "100% acceptance criteria pass"
+  L1_5_pacs:
+    enabled: true
+    min_score: 70
+    dimensions: ["faithfulness", "completeness", "logic"]
+  L2_adversarial_review:
+    enabled: true
+    generator_critic: true
+
+circuit_breaker:
+  state: "CLOSED"
+  consecutive_failures: 0
+  failure_threshold: 2
+
+steps:
+  - id: 1
+    name: "Workspace Warmup & Constitution"
+    status: "COMPLETED"
+    deliverables:
+      - "docs/CONSTITUTION.md"
+      - "docs/agent-rules.yaml"
+      - "docs/adr/ADR-001-toolchain-and-cli-architecture.md"
+      - ".fable/state.json"
+      - ".env.example"
+      - "package.json"
+      - "tsconfig.json"
+  - id: 2
+    name: "Architecture & Card Decomposition (fable-plan)"
+    status: "READY"
+    deliverables:
+      - ".planning/cards/"
+  - id: 3
+    name: "TDD Core Domain & Reddit Client Mock (fable-tdd)"
+    status: "PENDING"
+    deliverables:
+      - "tests/unit/"
+  - id: 4
+    name: "CLI & Agent Implementation (fable-execute)"
+    status: "PENDING"
+    deliverables:
+      - "src/"
+  - id: 5
+    name: "3-Pass Verification & Release Gate (fable-verify)"
+    status: "PENDING"
+    deliverables:
+      - "dist/"
+      - "verification-evidence.md"

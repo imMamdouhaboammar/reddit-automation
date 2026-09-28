@@ -1,0 +1,39 @@
+{
+  "name": "reddit-agentic-cli",
+  "version": "0.0.1",
+  "description": "Reddit Agentic Automation CLI Tool",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "reddit-agent": "dist/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "bunx biome check . 2>/dev/null || tsc --noEmit"
+  },
+  "keywords": [
+    "reddit",
+    "agentic",
+    "automation",
+    "cli",
+    "ai-agents"
+  ],
+  "author": "Mamdouh Aboammar",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.7"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
+  }
+}

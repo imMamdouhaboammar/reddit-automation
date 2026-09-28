@@ -1,0 +1,24 @@
+{
+  "project": "reddit-agentic-cli",
+  "version": "0.0.1",
+  "lifecycle": {
+    "current_phase": "warmup",
+    "active_skill": "fable-plan",
+    "circuit_breaker": {
+      "state": "CLOSED",
+      "consecutive_failures": 0,
+      "max_failures_threshold": 2
+    },
+    "routing_packet": {
+      "intent": "Workspace warmup for Reddit agentic automation CLI tool (no code yet)",
+      "current_phase": "warmup_completed",
+      "state_overrides": "none",
+      "primary_next_decision": "Decompose CLI command architecture and Reddit API client contracts into verifiable cards",
+      "selected_skill": "fable-plan",
+      "why_this_skill_now": "Workspace initialized, constitutional invariants established, ready for structured planning before implementation",
+      "gate_to_leave_it": "accepted_cards_with_acceptance_criteria",
+      "likely_continuations": ["fable-tdd", "fable-execute", "fable-verify"]
+    }
+  },
+  "last_updated": "2026-09-28T14:45:00+03:00"
+}
