@@ -1,3 +1,0 @@
-# Project Progress
-
-- Project initialized.

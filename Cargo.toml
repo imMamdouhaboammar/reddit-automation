@@ -6,7 +6,7 @@ authors = ["Mamdouh Aboammar"]
 description = "Fast, local-first, multi-account Agentic Reddit Operator in Rust"
 license-file = "LICENSE"
 readme = "README.md"
-repository = "https://github.com/imMamdouhaboammar/reddit-agent"
+repository = "https://github.com/imMamdouhaboammar/reddit-automation"
 publish = false
 
 [dependencies]

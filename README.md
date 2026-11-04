@@ -3,7 +3,7 @@
 [![Build Status](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](Cargo.toml)
 [![Runtime](https://img.shields.io/badge/Bun-1.3%2B-black.svg)](package.json)
 [![Linter](https://img.shields.io/badge/Oxlint-Anti--Slop-green.svg)](.oxlintrc.json)
-[![Tests](https://img.shields.io/badge/Tests-63%2F63%20Passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-67%2F67%20Passing-brightgreen.svg)](tests/)
 [![License: Commons Clause](https://img.shields.io/badge/License-Source--Available-blue.svg)](LICENSE)
 
 **The autonomous, anti-ban agentic Reddit operator. Mine customer pain points, engage with verified technical depth, and build organic karma 24/7 without getting shadowbanned.**

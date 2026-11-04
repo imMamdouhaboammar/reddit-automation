@@ -1,9 +1,0 @@
-# Fable Ledger: Agentic Reddit Operator (Rust)
-
-- [x] CARD-01: Rust Foundation, SQLite Multi-Account Registry, OS Keyring Token Isolation, OAuth2 Flow with Localhost Callback -- evidence: cargo test storage:: auth:: accounts:: passed with in-memory SQLite and MemoryKeyring token isolation
-- [x] CARD-02: Capability Architecture, Router, and RedditApiDriver (Identity, Karma, Scopes, Preferences GET/PATCH, Rate Limit Tracking) -- evidence: cargo test drivers::reddit_api router:: passed with wiremock identity and prefs mock
-- [x] CARD-03: Content Publishing, Subreddit Rules, Post Requirements, 2-Stage Prepare/Execute Model with Tamper-Proof Payload Hash & Risk Levels -- evidence: cargo test actions:: passed verifying post requirements validation, tamper-proofing SHA-256 and approval gate
-- [x] CARD-04: Account Control, Subscriptions, Saved/Hidden, Inbox Management, and Deterministic Account Health Engine -- evidence: cargo test storage:: accounts:: and e2e integration tests passed for account control and inbox management
-- [x] CARD-05: BrowserDriver with Chromiumoxide, Isolated Profile Per-Account, Interactive Login, Session Verification, UI Navigation -- evidence: cargo test drivers::browser:: passed for chrome path detection, profile isolation, and security checkpoint enforcement
-- [x] CARD-06: Agent Issue Diagnosis & Safe Repair Engine (OAuth revoked, missing scope, session expired, wrong prefs, post rejection/removal, locked/suspension checkpoint) -- evidence: cargo test issues:: passed for security challenges, post rejections, and safe repair automation gating
-- [x] CARD-07: Full MCP Server Agent Surface, CLI Admin Surface, End-to-End Test Suite, Red-Green Verification, and 3-Pass Verification -- evidence: cargo test --test integration_test passed (4/4 e2e tests), cargo clippy --all-targets -- -D warnings clean, cargo fmt --check clean
