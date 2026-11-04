@@ -220,6 +220,16 @@ pub enum AccountSubcommand {
         #[arg(long, default_value = "180")]
         timeout_secs: u64,
     },
+    /// Sync active Reddit session cookies directly from Google Chrome profile (e.g. mamdouhfces1997@gmail.com)
+    SyncChrome {
+        alias: String,
+        #[arg(
+            long,
+            default_value = "Default",
+            help = "Chrome profile directory name (e.g. 'Default')"
+        )]
+        profile: String,
+    },
     /// Show identity for account
     Whoami { alias: Option<String> },
 }
@@ -647,6 +657,85 @@ impl AppContext {
                         } else {
                             "Profile directory only"
                         }
+                    );
+                }
+
+                AccountSubcommand::SyncChrome { alias, profile } => {
+                    let ctx = self.account_manager.get_account_context(Some(&alias))?;
+                    println!(
+                        "Syncing Reddit session from Google Chrome profile '{}' for account '{}'...",
+                        profile, alias
+                    );
+
+                    let output = std::process::Command::new("bun")
+                        .arg("run")
+                        .arg("scripts/sync_chrome_cookies.ts")
+                        .arg(&profile)
+                        .output()
+                        .map_err(|e| anyhow::anyhow!("Failed to execute bun script: {}", e))?;
+
+                    if !output.status.success() {
+                        let err_str = String::from_utf8_lossy(&output.stderr);
+                        anyhow::bail!("Chrome sync failed: {}", err_str);
+                    }
+
+                    let val: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+                    if !val["success"].as_bool().unwrap_or(false) {
+                        anyhow::bail!(
+                            "Chrome sync error: {}",
+                            val["error"].as_str().unwrap_or("unknown")
+                        );
+                    }
+
+                    let username = val["username"]
+                        .as_str()
+                        .unwrap_or("unknown")
+                        .to_string();
+                    let raw_cookies = val["cookies"]
+                        .as_array()
+                        .cloned()
+                        .unwrap_or_default();
+                    let mut session_cookies = Vec::new();
+
+                    for c in raw_cookies {
+                        session_cookies.push(crate::drivers::browser::SessionCookie {
+                            name: c["name"].as_str().unwrap_or_default().to_string(),
+                            value: c["value"].as_str().unwrap_or_default().to_string(),
+                            domain: c["domain"].as_str().map(String::from),
+                            path: c["path"].as_str().map(String::from),
+                            secure: c["secure"].as_bool(),
+                            http_only: c["http_only"].as_bool(),
+                            same_site: c["same_site"].as_str().map(String::from),
+                            expires: c["expires"].as_i64(),
+                        });
+                    }
+
+                    let cookie_count = session_cookies.len();
+                    let jar = crate::drivers::browser::SessionCookieJar {
+                        alias: alias.clone(),
+                        reddit_username: Some(username.clone()),
+                        captured_at: chrono::Utc::now().to_rfc3339(),
+                        cookie_count,
+                        cookies: session_cookies,
+                    };
+
+                    self.browser_driver
+                        .save_cookies_to_keychain(&alias, &jar)?;
+                    self.account_manager
+                        .link_identity(&ctx.account.id, &username, &[])?;
+                    self.storage
+                        .update_reddit_username(&ctx.account.id, &username)?;
+
+                    println!("Chrome Session Synced Successfully!");
+                    println!("  Account Alias:    {}", alias);
+                    println!("  Reddit Username:  u/{}", username);
+                    println!(
+                        "  Cookies Secured:  {} encrypted in OS Keychain",
+                        cookie_count
+                    );
+                    println!(
+                        "  Profile Source:   Chrome '{}' (mamdouhfces1997@gmail.com)",
+                        profile
                     );
                 }
 

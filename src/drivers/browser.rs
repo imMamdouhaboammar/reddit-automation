@@ -492,8 +492,27 @@ impl BrowserDriver {
             &crate::auth::AuthManager::keyring_cookies_account(alias),
         ) {
             Ok(secret) => {
+                let raw = secret.expose_secret();
+                let clean_hex = raw
+                    .strip_prefix("0x")
+                    .or_else(|| raw.strip_prefix("0X"))
+                    .unwrap_or(raw);
+
+                let decoded_str = if clean_hex.len() % 2 == 0
+                    && (clean_hex.starts_with("7b22") || clean_hex.starts_with("7B22"))
+                    && clean_hex.chars().all(|c| c.is_ascii_hexdigit())
+                {
+                    if let Ok(bytes) = hex::decode(clean_hex) {
+                        String::from_utf8(bytes).unwrap_or_else(|_| raw.to_string())
+                    } else {
+                        raw.to_string()
+                    }
+                } else {
+                    raw.to_string()
+                };
+
                 let jar: SessionCookieJar =
-                    serde_json::from_str(secret.expose_secret()).map_err(|e| {
+                    serde_json::from_str(&decoded_str).map_err(|e| {
                         DriverError::Internal(format!(
                             "Failed to parse session cookies from Keychain: {}",
                             e
