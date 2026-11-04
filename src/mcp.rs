@@ -358,11 +358,47 @@ impl McpServer {
                         "account": { "type": "string", "description": "Account alias to audit." }
                     }
                 }
+            },
+            {
+                "name": "reddit_2_skill",
+                "description": "Mine deep Reddit consensus and engineer a production-grade Agent Skill conforming to OmniSkill v6.2.0 and Poteto Mode.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["topic"],
+                    "properties": {
+                        "topic": { "type": "string", "description": "Topic or problem domain to research and synthesize." },
+                        "subreddits": { "type": "array", "items": { "type": "string" }, "description": "Optional list of subreddits to focus on." },
+                        "output_dir": { "type": "string", "description": "Optional base directory to write the generated skill." }
+                    }
+                }
             }
         ])
     }
 
     pub async fn handle_tool_call(&self, name: &str, args: Value) -> Result<Value, String> {
+        if name == "reddit_2_skill" {
+            let topic = args["topic"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'topic' argument".to_string())?;
+
+            let subreddits: Option<Vec<String>> = args["subreddits"].as_array().map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            });
+
+            let output_dir_str = args["output_dir"].as_str();
+            let output_dir_path = output_dir_str.map(std::path::Path::new);
+
+            let engine = crate::agents::reddit_2_skill::Reddit2SkillEngine::new();
+            let package = engine
+                .mine_and_forge_skill(topic, subreddits, output_dir_path)
+                .await
+                .map_err(|e| format!("reddit-2-skill failed: {}", e))?;
+
+            return Ok(json!(package));
+        }
+
         if name == "reddit_discover_opportunities" {
             let product_name = args["product_name"].as_str().unwrap_or("Product").to_string();
             let value_prop = args["value_prop"].as_str().unwrap_or("").to_string();

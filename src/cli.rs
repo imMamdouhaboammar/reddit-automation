@@ -90,6 +90,24 @@ pub enum Commands {
         #[command(subcommand)]
         subcommand: OpportunitySubcommand,
     },
+    /// Mine Reddit deep consensus to forge a production-grade Agent Skill (OmniSkill v6.2.0)
+    #[command(name = "reddit-2-skill", alias = "r2s")]
+    Reddit2Skill {
+        #[arg(
+            long,
+            short,
+            help = "Topic or problem context to research on Reddit (e.g. 'vibe coding errors')"
+        )]
+        topic: String,
+        #[arg(long, help = "Comma-separated subreddits to prioritize")]
+        subreddits: Option<String>,
+        #[arg(
+            long,
+            default_value = "skills",
+            help = "Base directory to write generated skill folder"
+        )]
+        output_dir: PathBuf,
+    },
     /// Start Model Context Protocol (MCP) server over Stdio
     Mcp,
 }
@@ -106,6 +124,10 @@ pub enum OpportunitySubcommand {
         value_prop: String,
         #[arg(long, default_value = "10")]
         limit: usize,
+        #[arg(long, default_value = "text", help = "Output format: text, json, md")]
+        format: String,
+        #[arg(long, help = "Optional file path to write output artifact")]
+        output: Option<PathBuf>,
     },
     /// Draft an experience-grammar reply adhering to honest disclosure
     Draft {
@@ -811,8 +833,9 @@ impl AppContext {
                     product,
                     value_prop,
                     limit,
+                    format,
+                    output,
                 } => {
-                    println!("Scanning r/{} for high-intent opportunities...", subreddit);
                     let product_ctx = ProductContext {
                         product_name: product,
                         value_prop,
@@ -836,7 +859,7 @@ impl AppContext {
                     let keyless = RedditKeylessDriver::new();
                     let threads = keyless
                         .discover_threads(
-                            &[subreddit],
+                            &[subreddit.clone()],
                             &product_ctx.high_intent_phrases,
                             limit,
                         )
@@ -849,22 +872,76 @@ impl AppContext {
                         now,
                     );
 
-                    println!("\nFound {} ranked opportunities:\n", ranked.len());
-                    for (i, opp) in ranked.iter().take(10).enumerate() {
-                        println!(
-                            "{}. [Score: {:.2}] {} (r/{})",
-                            i + 1,
-                            opp.composite_score,
-                            opp.thread.title,
-                            opp.thread.subreddit
-                        );
-                        println!("   URL:     {}", opp.thread.canonical_url());
-                        println!("   Why:     {}", opp.opportunity_reason);
-                        println!(
-                            "   Signals: {:?} | Comments: {}",
-                            opp.detected_signals, opp.thread.num_comments
-                        );
-                        println!();
+                    let formatted_output = match format.to_lowercase().as_str() {
+                        "json" => serde_json::to_string_pretty(&ranked)?,
+                        "md" | "markdown" => {
+                            let mut md = String::new();
+                            md.push_str(&format!("# Reddit Opportunities: r/{}\n\n", subreddit));
+                            md.push_str(&format!(
+                                "*Found {} ranked opportunities for `{}`*\n\n",
+                                ranked.len(),
+                                product_ctx.product_name
+                            ));
+                            md.push_str("| # | Title | Subreddit | Score | Signals | Link |\n");
+                            md.push_str("|---|---|---|---|---|---|\n");
+                            for (i, opp) in ranked.iter().take(20).enumerate() {
+                                let clean_title = opp.thread.title.replace('|', "\\|");
+                                let signals_str = opp
+                                    .detected_signals
+                                    .iter()
+                                    .map(|s| format!("{:?}", s))
+                                    .collect::<Vec<_>>()
+                                    .join(", ");
+                                md.push_str(&format!(
+                                    "| {} | {} | r/{} | {:.2} | {} | [View Thread]({}) |\n",
+                                    i + 1,
+                                    clean_title,
+                                    opp.thread.subreddit,
+                                    opp.composite_score,
+                                    signals_str,
+                                    opp.thread.canonical_url()
+                                ));
+                            }
+                            md.push_str("\n## Detailed Breakdown\n\n");
+                            for (i, opp) in ranked.iter().take(10).enumerate() {
+                                md.push_str(&format!("### {}. {}\n\n", i + 1, opp.thread.title));
+                                md.push_str(&format!("- **URL:** {}\n", opp.thread.canonical_url()));
+                                md.push_str(&format!(
+                                    "- **Opportunity Reason:** {}\n",
+                                    opp.opportunity_reason
+                                ));
+                                md.push_str(&format!(
+                                    "- **Comments:** {} | **Composite Score:** {:.2}\n\n",
+                                    opp.thread.num_comments, opp.composite_score
+                                ));
+                            }
+                            md
+                        }
+                        _ => {
+                            let mut text =
+                                format!("\nFound {} ranked opportunities:\n\n", ranked.len());
+                            for (i, opp) in ranked.iter().take(10).enumerate() {
+                                text.push_str(&format!(
+                                    "{}. [Score: {:.2}] {} (r/{})\n   URL:     {}\n   Why:     {}\n   Signals: {:?} | Comments: {}\n\n",
+                                    i + 1,
+                                    opp.composite_score,
+                                    opp.thread.title,
+                                    opp.thread.subreddit,
+                                    opp.thread.canonical_url(),
+                                    opp.opportunity_reason,
+                                    opp.detected_signals,
+                                    opp.thread.num_comments
+                                ));
+                            }
+                            text
+                        }
+                    };
+
+                    if let Some(out_path) = output {
+                        std::fs::write(&out_path, &formatted_output)?;
+                        println!("Artifact written successfully to: {}", out_path.display());
+                    } else {
+                        println!("{}", formatted_output);
                     }
                 }
 
@@ -924,6 +1001,39 @@ impl AppContext {
                     }
                 }
             },
+
+            Commands::Reddit2Skill {
+                topic,
+                subreddits,
+                output_dir,
+            } => {
+                println!("🚀 Launching reddit-2-skill for topic: '{}'...", topic);
+                let custom_subs: Option<Vec<String>> = subreddits.map(|s| {
+                    s.split(',')
+                        .map(|item| item.trim().trim_start_matches("r/").to_string())
+                        .filter(|item| !item.is_empty())
+                        .collect()
+                });
+
+                let engine = crate::agents::reddit_2_skill::Reddit2SkillEngine::new();
+                let package = engine
+                    .mine_and_forge_skill(&topic, custom_subs, Some(&output_dir))
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e))?;
+
+                println!("\n✅ Successfully forged Agent Skill: '{}'", package.skill_name);
+                println!("- Display Name:       {}", package.display_name);
+                println!("- Target Subreddits:  r/{}", package.target_subreddits.join(", r/"));
+                println!("- Analyzed Threads:   {}", package.analyzed_threads_count);
+                println!(
+                    "- Output Directory:   {}",
+                    output_dir.join(&package.skill_name).display()
+                );
+                println!("\nStructure created:");
+                println!("  ├── SKILL.md                 (AgentSkills.io v1 & Poteto Mode standard)");
+                println!("  ├── scripts/preflight_check.py");
+                println!("  └── references/reddit_evidence.md");
+            }
 
             Commands::Mcp => {
                 let server = McpServer::new(
