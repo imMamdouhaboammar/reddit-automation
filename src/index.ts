@@ -44,7 +44,7 @@ export function runCli(args: string[] = process.argv.slice(2)): Promise<number> 
   });
 }
 
-if (import.meta.main || (typeof require !== "undefined" && require.main === module)) {
+if (import.meta.main) {
   runCli().then((code) => {
     process.exit(code);
   }).catch((err) => {

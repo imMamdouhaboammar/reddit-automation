@@ -10,7 +10,7 @@ describe("TypeScript CLI Wrapper", () => {
 
   it("resolves the compiled Rust binary path", () => {
     const binPath = resolveBinaryPath();
-    expect(typeof binPath).toBe("string");
+    expect(binPath).toBeTypeOf("string");
     expect(binPath).toContain("reddit-agent");
   });
 });
