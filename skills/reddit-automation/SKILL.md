@@ -9,7 +9,7 @@ description: >
   (25-55 words with mandatory affiliation disclosure), 90/10 community ratio auditing,
   cryptographic two-stage approval gates (SHA-256), and automated skill synthesis (reddit-2-skill).
 emoji: "👽"
-homepage: https://github.com/imMamdouhaboammar/reddit-agent
+homepage: https://github.com/imMamdouhaboammar/reddit-automation
 license: MIT
 metadata:
   openclaw:
@@ -36,7 +36,7 @@ metadata:
 
 Automate high-intent community discovery, experience-grammar drafting, disclosure-compliant publishing, and knowledge synthesis on Reddit with zero spam, zero astroturfing, and cryptographic fail-closed safety.
 
-Powered by [`reddit-agent`](https://github.com/imMamdouhaboammar/reddit-agent) native Rust core with 32 Model Context Protocol (MCP) tools.
+Powered by [`reddit-automation`](https://github.com/imMamdouhaboammar/reddit-automation) native Rust core with 32 Model Context Protocol (MCP) tools.
 
 ---
 

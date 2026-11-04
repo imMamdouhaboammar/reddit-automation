@@ -78,10 +78,10 @@ flowchart TD
 ### 1. Build and Test
 
 ```bash
-git clone https://github.com/imMamdouhaboammar/reddit-agent.git
-cd reddit-agent
+git clone https://github.com/imMamdouhaboammar/reddit-automation.git
+cd reddit-automation
 
-# Run full test suite (63/63 tests)
+# Run full test suite (67/67 tests)
 cargo test
 bun test
 bunx oxlint src/
