@@ -7,6 +7,7 @@ use thiserror::Error;
 pub mod browser;
 pub mod reddit_api;
 pub mod reddit_keyless;
+pub mod split_plane;
 
 #[derive(Error, Debug)]
 pub enum DriverError {
