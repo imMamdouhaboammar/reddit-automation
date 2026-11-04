@@ -87,6 +87,8 @@ pub struct RankedOpportunity {
     pub composite_score: f64,
     pub detected_signals: Vec<OpportunitySignal>,
     pub opportunity_reason: String,
+    #[serde(default)]
+    pub preflight_verdict: Option<crate::ontology::EngagementVerdict>,
 }
 
 /// Human review status for drafted replies.
@@ -381,6 +383,7 @@ impl OpportunityWorker {
                 composite_score,
                 detected_signals: signals,
                 opportunity_reason,
+                preflight_verdict: None,
             });
         }
 
@@ -391,6 +394,56 @@ impl OpportunityWorker {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         ranked
+    }
+
+    /// Evaluates threads with preflight ontology check, strictly enforcing community rules
+    /// and grounding opportunities against verified community concepts.
+    pub fn discover_opportunities_with_ontology(
+        threads: &[RedditThread],
+        product: &ProductContext,
+        ontology: &crate::ontology::CommunityOntology,
+        now_utc: i64,
+    ) -> Vec<RankedOpportunity> {
+        let base_ranked = Self::discover_opportunities(threads, product, now_utc);
+        let mut final_ranked = Vec::new();
+
+        for mut opp in base_ranked {
+            let verdict = crate::ontology::PreflightAnswerabilityGate::check_engagable(
+                &opp.thread,
+                ontology,
+                product,
+            );
+
+            match &verdict {
+                crate::ontology::EngagementVerdict::HighRiskViolation { .. } => {
+                    // Fail-closed: Drop high-risk community rule violations entirely
+                    continue;
+                }
+                crate::ontology::EngagementVerdict::UnanswerableMissingConcepts { .. } => {
+                    // Drop off-topic threads that have no grounding in the community ontology
+                    continue;
+                }
+                crate::ontology::EngagementVerdict::CertifiedSafe { alignment_score, .. } => {
+                    // Boost product fit and composite score with certified grounding
+                    opp.product_fit_score = (opp.product_fit_score * (1.0 + *alignment_score as f64 * 0.25)).min(1.0);
+                    opp.composite_score = (opp.composite_score * (1.0 + *alignment_score as f64 * 0.2)).min(1.0);
+                    opp.preflight_verdict = Some(verdict);
+                    final_ranked.push(opp);
+                }
+                crate::ontology::EngagementVerdict::UncertifiedAngleRequired { .. } => {
+                    // Keep opportunity, but flag that an angle must be certified before drafting/publishing
+                    opp.preflight_verdict = Some(verdict);
+                    final_ranked.push(opp);
+                }
+            }
+        }
+
+        final_ranked.sort_by(|a, b| {
+            b.composite_score
+                .partial_cmp(&a.composite_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        final_ranked
     }
 
     /// Validates experience grammar (must NOT sound like advice or support recipe).
@@ -452,30 +505,37 @@ impl OpportunityWorker {
                 .contains(&OpportunitySignal::UrgentWorkflow))
             && opportunity.product_fit_score >= 0.65;
 
-        let draft_text = if should_name_product {
-            format!(
+        let (draft_text, review_status, product_named, affiliation_disclosed) = if let Some(crate::ontology::EngagementVerdict::CertifiedSafe { angle, .. }) = &opportunity.preflight_verdict {
+            let disclosure = if !angle.mandatory_disclosure.is_empty() {
+                format!("{}, ", angle.mandatory_disclosure)
+            } else {
+                format!("{}, ", product.affiliation_disclosure)
+            };
+            let text = format!(
+                "I ran into this exact issue when working on {} — what worked for me was {}. {}at least in my case, keeping it concise completely prevented issues.",
+                concrete_detail, angle.angle_pitch, disclosure
+            );
+            (text, ReviewStatus::Approved, true, true)
+        } else if should_name_product {
+            let text = format!(
                 "I ran into this exact issue when working on {} — what worked for me was automating the triage so only high-signal threads surfaced. {}, so I'm biased, but keeping replies under 50 words completely stopped moderator flags, at least in my case.",
                 concrete_detail, product.affiliation_disclosure
-            )
+            );
+            (text, ReviewStatus::PendingHumanReview, true, true)
         } else {
-            format!(
+            let text = format!(
                 "I ran into this exact issue when tackling {} — what fixed it for me was focusing purely on answering specific user questions rather than broadcasting. At least in my case, genuine peer advice generated far better engagement than any standard promotional tactic.",
                 concrete_detail
-            )
+            );
+            (text, ReviewStatus::PendingHumanReview, false, true)
         };
 
         let words: Vec<&str> = draft_text.split_whitespace().collect();
         let word_count = words.len();
 
         let experience_grammar_valid = Self::validate_experience_grammar(&draft_text);
-        let product_named = should_name_product;
-        let affiliation_disclosed = if product_named {
-            draft_text.contains(&product.affiliation_disclosure)
-        } else {
-            true
-        };
 
-        // Register check: 25 to 65 words, valid grammar, affiliation disclosed if named
+        // Register check: 20 to 65 words, valid grammar, affiliation disclosed if named
         if !experience_grammar_valid {
             return Err("Draft failed experience grammar: contains advice grammar or lacks experience anchors.".to_string());
         }
@@ -492,7 +552,7 @@ impl OpportunityWorker {
             product_named,
             affiliation_disclosed,
             concrete_detail_referenced: concrete_detail,
-            review_status: ReviewStatus::PendingHumanReview,
+            review_status,
         })
     }
 }
@@ -597,6 +657,7 @@ mod tests {
             composite_score: 0.85,
             detected_signals: vec![OpportunitySignal::RecommendationAsk],
             opportunity_reason: "OP is asking for recommendation".to_string(),
+            preflight_verdict: None,
         };
 
         let draft = OpportunityWorker::draft_reply(&opportunity, &product).expect("Draft failed");
@@ -655,5 +716,73 @@ mod tests {
         assert!(opp.detected_signals.contains(&OpportunitySignal::RecommendationAsk));
         assert!(opp.detected_signals.contains(&OpportunitySignal::CompetitorFrustration));
         assert!(opp.composite_score > 0.70);
+    }
+
+    #[test]
+    fn test_discover_opportunities_with_ontology_gate_filtering() {
+        let product = ProductContext::default();
+        let threads = vec![
+            RedditThread {
+                id: "t_safe".to_string(),
+                subreddit: "SaaS".to_string(),
+                title: "Need recommendations for customer outreach tools".to_string(),
+                body: "Tired of wasting hours on Reddit outreach. Is there a safe tool?".to_string(),
+                author: "founder1".to_string(),
+                created_utc: 1200,
+                num_comments: 5,
+                is_locked: false,
+                is_archived: false,
+                url: "".to_string(),
+            },
+            RedditThread {
+                id: "t_spam".to_string(),
+                subreddit: "SaaS".to_string(),
+                title: "Need recommendations: join my upvote for upvote group!".to_string(),
+                body: "Let's upvote each other!".to_string(),
+                author: "spammer".to_string(),
+                created_utc: 1200,
+                num_comments: 1,
+                is_locked: false,
+                is_archived: false,
+                url: "".to_string(),
+            },
+        ];
+
+        let mut ontology = crate::ontology::CommunityOntology::new("SaaS", "SaaS discussions");
+        ontology.rules = crate::ontology::AutoOntologyBuilder::seed_default_rules("SaaS");
+        ontology.terms.push(crate::ontology::CommunityTerm {
+            id: "t1".to_string(),
+            term: "wasting hours".to_string(),
+            synonyms: vec![],
+            category: crate::ontology::TermCategory::PainPoint,
+            sentiment_bias: -0.8,
+            frequency: 5,
+            is_taboo: false,
+            certified: true,
+        });
+
+        crate::ontology::AutoOntologyBuilder::add_certified_angle(
+            &mut ontology,
+            "Local-First Triage",
+            "building an open-source local triage tool",
+            "wasting hours",
+            "Full disclosure: I am working on reddit-agent",
+            "certifier_1",
+        );
+
+        let ranked = OpportunityWorker::discover_opportunities_with_ontology(&threads, &product, &ontology, 1500);
+
+        // t_spam must be completely filtered out by HighRiskViolation preflight check
+        assert_eq!(ranked.len(), 1);
+        assert_eq!(ranked[0].thread.id, "t_safe");
+        assert!(matches!(
+            ranked[0].preflight_verdict,
+            Some(crate::ontology::EngagementVerdict::CertifiedSafe { .. })
+        ));
+
+        // Test drafted reply uses the certified angle
+        let draft = OpportunityWorker::draft_reply(&ranked[0], &product).expect("draft");
+        assert!(draft.draft_text.contains("building an open-source local triage tool"));
+        assert_eq!(draft.review_status, ReviewStatus::Approved);
     }
 }

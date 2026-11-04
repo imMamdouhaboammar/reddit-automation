@@ -205,6 +205,25 @@ impl Storage {
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS community_ontologies (
+                subreddit TEXT PRIMARY KEY,
+                data_json TEXT NOT NULL,
+                version INTEGER NOT NULL DEFAULT 1,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS certified_angles (
+                id TEXT PRIMARY KEY,
+                subreddit TEXT NOT NULL,
+                title TEXT NOT NULL,
+                angle_pitch TEXT NOT NULL,
+                target_pain_point TEXT NOT NULL,
+                mandatory_disclosure TEXT NOT NULL,
+                certified_by TEXT NOT NULL,
+                certified_at TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1
+            );
             "#,
         )?;
         Ok(())
@@ -741,6 +760,139 @@ impl Storage {
             Err(e) => Err(StorageError::Sqlite(e)),
         }
     }
+
+    // Community Ontology & Certified Angles operations
+    pub fn save_community_ontology(
+        &self,
+        ontology: &crate::ontology::CommunityOntology,
+    ) -> Result<(), StorageError> {
+        let conn = self.conn.lock().map_err(|_| StorageError::LockError)?;
+        let data_json = serde_json::to_string(ontology)?;
+        let sub_lower = ontology.subreddit.to_lowercase();
+        conn.execute(
+            r#"
+            INSERT INTO community_ontologies (subreddit, data_json, version, updated_at)
+            VALUES (?1, ?2, ?3, ?4)
+            ON CONFLICT(subreddit) DO UPDATE SET
+                data_json = excluded.data_json,
+                version = excluded.version,
+                updated_at = excluded.updated_at
+            "#,
+            params![sub_lower, data_json, ontology.version, ontology.updated_at],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_community_ontology(
+        &self,
+        subreddit: &str,
+    ) -> Result<Option<crate::ontology::CommunityOntology>, StorageError> {
+        let conn = self.conn.lock().map_err(|_| StorageError::LockError)?;
+        let sub_lower = subreddit.to_lowercase();
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT data_json FROM community_ontologies WHERE subreddit = ?1
+            "#,
+        )?;
+
+        let res = stmt.query_row(params![sub_lower], |row| {
+            let json_str: String = row.get(0)?;
+            Ok(json_str)
+        });
+
+        match res {
+            Ok(json_str) => {
+                let ontology: crate::ontology::CommunityOntology = serde_json::from_str(&json_str)?;
+                Ok(Some(ontology))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(StorageError::Sqlite(e)),
+        }
+    }
+
+    pub fn list_community_ontologies(&self) -> Result<Vec<String>, StorageError> {
+        let conn = self.conn.lock().map_err(|_| StorageError::LockError)?;
+        let mut stmt = conn.prepare("SELECT subreddit FROM community_ontologies ORDER BY subreddit ASC")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        let mut subs = Vec::new();
+        for r in rows {
+            subs.push(r?);
+        }
+        Ok(subs)
+    }
+
+    pub fn save_certified_angle(
+        &self,
+        subreddit: &str,
+        angle: &crate::ontology::CertifiedAngle,
+    ) -> Result<(), StorageError> {
+        let conn = self.conn.lock().map_err(|_| StorageError::LockError)?;
+        let sub_lower = subreddit.to_lowercase();
+        conn.execute(
+            r#"
+            INSERT INTO certified_angles (
+                id, subreddit, title, angle_pitch, target_pain_point,
+                mandatory_disclosure, certified_by, certified_at, active
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                angle_pitch = excluded.angle_pitch,
+                target_pain_point = excluded.target_pain_point,
+                mandatory_disclosure = excluded.mandatory_disclosure,
+                certified_by = excluded.certified_by,
+                certified_at = excluded.certified_at,
+                active = excluded.active
+            "#,
+            params![
+                angle.id,
+                sub_lower,
+                angle.title,
+                angle.angle_pitch,
+                angle.target_pain_point,
+                angle.mandatory_disclosure,
+                angle.certified_by,
+                angle.certified_at,
+                angle.active as i32
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_certified_angles(
+        &self,
+        subreddit: &str,
+    ) -> Result<Vec<crate::ontology::CertifiedAngle>, StorageError> {
+        let conn = self.conn.lock().map_err(|_| StorageError::LockError)?;
+        let sub_lower = subreddit.to_lowercase();
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT id, title, angle_pitch, target_pain_point, mandatory_disclosure,
+                   certified_by, certified_at, active
+            FROM certified_angles
+            WHERE subreddit = ?1 AND active = 1
+            "#,
+        )?;
+
+        let rows = stmt.query_map(params![sub_lower], |row| {
+            Ok(crate::ontology::CertifiedAngle {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                angle_pitch: row.get(2)?,
+                target_pain_point: row.get(3)?,
+                mandatory_disclosure: row.get(4)?,
+                certified_by: row.get(5)?,
+                certified_at: row.get(6)?,
+                active: row.get::<_, i32>(7)? == 1,
+            })
+        })?;
+
+        let mut angles = Vec::new();
+        for r in rows {
+            angles.push(r?);
+        }
+        Ok(angles)
+    }
 }
 
 #[cfg(test)]
@@ -794,5 +946,47 @@ mod tests {
         let retrieved = storage.get_pending_action("act_100").expect("get");
         assert_eq!(retrieved.payload_hash, "hash123");
         assert_eq!(retrieved.status, "pending");
+    }
+
+    #[test]
+    fn test_storage_community_ontology_persistence() {
+        let storage = Storage::new_in_memory().expect("in-memory db");
+        let mut ontology = crate::ontology::CommunityOntology::new("vibecoding", "Vibe Coding discussions");
+        ontology.terms.push(crate::ontology::CommunityTerm {
+            id: "term_1".to_string(),
+            term: "spec-driven".to_string(),
+            synonyms: vec!["specs".to_string()],
+            category: crate::ontology::TermCategory::TechnicalConcept,
+            sentiment_bias: 0.5,
+            frequency: 4,
+            is_taboo: false,
+            certified: true,
+        });
+
+        storage.save_community_ontology(&ontology).expect("save ontology");
+
+        let loaded = storage.get_community_ontology("vibecoding").expect("get ontology").expect("found");
+        assert_eq!(loaded.subreddit, "vibecoding");
+        assert_eq!(loaded.terms.len(), 1);
+        assert_eq!(loaded.terms[0].term, "spec-driven");
+
+        let subs = storage.list_community_ontologies().expect("list subs");
+        assert_eq!(subs, vec!["vibecoding".to_string()]);
+
+        let angle = crate::ontology::CertifiedAngle {
+            id: "ang_1".to_string(),
+            title: "Zero-Shot Engineering".to_string(),
+            angle_pitch: "Share reproducible prompt templates".to_string(),
+            target_pain_point: "spec-driven".to_string(),
+            mandatory_disclosure: "Disclosure: I maintain this repo".to_string(),
+            certified_by: "lead_reviewer".to_string(),
+            certified_at: Utc::now().to_rfc3339(),
+            active: true,
+        };
+
+        storage.save_certified_angle("vibecoding", &angle).expect("save angle");
+        let angles = storage.get_certified_angles("vibecoding").expect("get angles");
+        assert_eq!(angles.len(), 1);
+        assert_eq!(angles[0].title, "Zero-Shot Engineering");
     }
 }

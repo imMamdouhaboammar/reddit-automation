@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 pub mod accounts;
 pub mod actions;
 pub mod agents;
@@ -8,6 +10,7 @@ pub mod cli;
 pub mod drivers;
 pub mod issues;
 pub mod mcp;
+pub mod ontology;
 pub mod reddit;
 pub mod router;
 pub mod storage;

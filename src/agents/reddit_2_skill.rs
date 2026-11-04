@@ -187,6 +187,27 @@ impl Reddit2SkillEngine {
         skill_md.push_str("- Run full test suite and confirm green status.\n");
         skill_md.push_str("- Codify learnings to prevent future recurrence.\n\n");
 
+        // Extract community ontology domain graph for grounding
+        let primary_sub = subreddits.first().map(|s| s.as_str()).unwrap_or("reddit");
+        let ontology = crate::ontology::AutoOntologyBuilder::build_from_threads(
+            primary_sub,
+            topic,
+            threads,
+        );
+
+        skill_md.push_str("## Community Domain Ontology & Taboo Boundaries\n\n");
+        skill_md.push_str(&format!("*Extracted semantic boundaries for r/{}:*\n\n", primary_sub));
+        for rule in &ontology.rules {
+            skill_md.push_str(&format!("- **Rule: {}** ({:?}): {}\n", rule.rule_name, rule.severity, rule.description));
+        }
+        if !ontology.terms.is_empty() {
+            skill_md.push_str("\n### Verified Practitioner Concepts\n");
+            for term in ontology.terms.iter().take(8) {
+                skill_md.push_str(&format!("- `{}` ({:?})\n", term.term, term.category));
+            }
+        }
+        skill_md.push_str("\n");
+
         // 2. Build references/reddit_evidence.md
         let mut evidence_md = String::new();
         evidence_md.push_str(&format!("# Reddit Empirical Evidence Dossier: {}\n\n", topic));
@@ -211,6 +232,13 @@ impl Reddit2SkillEngine {
         evidence_md.push_str("1. **Cascading Patch Traps:** Repeated generic prompting leads to compounding errors and corrupted git history.\n");
         evidence_md.push_str("2. **Production Drift:** Features verified only in local previews fail under real concurrency and edge cases.\n");
         evidence_md.push_str("3. **Dependency Sprawl:** Unconstrained tool additions bloat packages and introduce security vulnerabilities.\n");
+
+        if !ontology.relationships.is_empty() {
+            evidence_md.push_str("\n## Discovered Problem-Solution Semantic Graph\n\n");
+            for rel in ontology.relationships.iter().take(10) {
+                evidence_md.push_str(&format!("- `{}` --[{:?}]--> `{}` (confidence: {:.2})\n", rel.from_term, rel.relation, rel.to_term, rel.confidence));
+            }
+        }
 
         // 3. Build scripts/preflight_check.py
         let script_content = r#"#!/usr/bin/env python3

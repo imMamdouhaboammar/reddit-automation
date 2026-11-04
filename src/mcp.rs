@@ -37,6 +37,7 @@ pub struct McpServer {
     action_manager: Arc<ActionManager>,
     issue_engine: Arc<IssueEngine>,
     browser_driver: Option<Arc<crate::drivers::browser::BrowserDriver>>,
+    storage: Option<Arc<crate::storage::Storage>>,
 }
 
 impl McpServer {
@@ -52,6 +53,7 @@ impl McpServer {
             action_manager,
             issue_engine,
             browser_driver: None,
+            storage: None,
         }
     }
 
@@ -60,6 +62,11 @@ impl McpServer {
         browser_driver: Arc<crate::drivers::browser::BrowserDriver>,
     ) -> Self {
         self.browser_driver = Some(browser_driver);
+        self
+    }
+
+    pub fn with_storage(mut self, storage: Arc<crate::storage::Storage>) -> Self {
+        self.storage = Some(storage);
         self
     }
 
@@ -480,6 +487,56 @@ impl McpServer {
                         "headless": { "type": "boolean", "description": "Run in headless mode (default: true)." }
                     }
                 }
+            },
+            {
+                "name": "reddit_ontology_get",
+                "description": "Inspect the semantic Community Ontology (terms, taboo rules, certified angles, relationships) for a given subreddit.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["subreddit"],
+                    "properties": {
+                        "subreddit": { "type": "string", "description": "Target subreddit name (e.g. 'vibecoding', 'SaaS')." }
+                    }
+                }
+            },
+            {
+                "name": "reddit_ontology_check_engagable",
+                "description": "Preflight Answerability Gate: verifies whether a thread can be safely engaged without risk of bans, evaluating against community taboos and human-certified angles.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["subreddit", "title"],
+                    "properties": {
+                        "subreddit": { "type": "string", "description": "Target subreddit name." },
+                        "title": { "type": "string", "description": "Reddit thread title." },
+                        "body": { "type": "string", "description": "Reddit thread body content." },
+                        "product_name": { "type": "string", "description": "Optional product name override." },
+                        "pain_point": { "type": "string", "description": "Optional pain point override." }
+                    }
+                }
+            },
+            {
+                "name": "reddit_ontology_certify_angle",
+                "description": "Human-in-the-loop certification: approve a value-first engagement angle and mandatory disclosure for a subreddit.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["subreddit", "title", "pitch", "target_pain_point"],
+                    "properties": {
+                        "subreddit": { "type": "string", "description": "Subreddit to certify angle for." },
+                        "title": { "type": "string", "description": "Descriptive title of the angle." },
+                        "pitch": { "type": "string", "description": "Approved value-first pitch or solution pattern." },
+                        "target_pain_point": { "type": "string", "description": "Target pain point or recurring trigger." },
+                        "mandatory_disclosure": { "type": "string", "description": "Mandatory affiliation disclosure." },
+                        "certified_by": { "type": "string", "description": "Reviewer name or identifier." }
+                    }
+                }
+            },
+            {
+                "name": "reddit_ontology_list",
+                "description": "List all subreddits currently configured with active Community Ontologies.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {}
+                }
             }
         ])
     }
@@ -755,6 +812,147 @@ impl McpServer {
             let draft = OpportunityWorker::draft_reply(&opp, &product)
                 .map_err(|e| format!("Drafting failed: {}", e))?;
             return Ok(json!(draft));
+        }
+
+        if name == "reddit_ontology_get" {
+            let subreddit = args["subreddit"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'subreddit' argument".to_string())?
+                .trim_start_matches("r/");
+
+            if let Some(storage) = &self.storage {
+                if let Ok(Some(ont)) = storage.get_community_ontology(subreddit) {
+                    return Ok(json!(ont));
+                }
+            }
+
+            // Fallback: build baseline ontology
+            let baseline = crate::ontology::AutoOntologyBuilder::build_from_threads(
+                subreddit,
+                &format!("Domain knowledge for r/{}", subreddit),
+                &[],
+            );
+            return Ok(json!(baseline));
+        }
+
+        if name == "reddit_ontology_check_engagable" {
+            let subreddit = args["subreddit"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'subreddit' argument".to_string())?
+                .trim_start_matches("r/");
+            let title = args["title"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'title' argument".to_string())?;
+            let body = args["body"].as_str().unwrap_or("");
+
+            let ontology = if let Some(storage) = &self.storage {
+                storage.get_community_ontology(subreddit).ok().flatten()
+            } else {
+                None
+            }
+            .unwrap_or_else(|| {
+                crate::ontology::AutoOntologyBuilder::build_from_threads(
+                    subreddit,
+                    &format!("Domain knowledge for r/{}", subreddit),
+                    &[],
+                )
+            });
+
+            let mut context = ProductContext::default();
+            if let Some(p_name) = args["product_name"].as_str() {
+                context.product_name = p_name.to_string();
+            }
+            if let Some(p_pain) = args["pain_point"].as_str() {
+                context.pain_points.push(p_pain.to_string());
+            }
+
+            let thread = crate::agents::opportunity::RedditThread {
+                id: "eval_thread".to_string(),
+                subreddit: subreddit.to_string(),
+                title: title.to_string(),
+                body: body.to_string(),
+                author: "evaluator".to_string(),
+                created_utc: chrono::Utc::now().timestamp(),
+                num_comments: 0,
+                is_locked: false,
+                is_archived: false,
+                url: "".to_string(),
+            };
+
+            let verdict = crate::ontology::PreflightAnswerabilityGate::check_engagable(
+                &thread,
+                &ontology,
+                &context,
+            );
+
+            return Ok(json!(verdict));
+        }
+
+        if name == "reddit_ontology_certify_angle" {
+            let subreddit = args["subreddit"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'subreddit' argument".to_string())?
+                .trim_start_matches("r/");
+            let title = args["title"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'title' argument".to_string())?;
+            let pitch = args["pitch"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'pitch' argument".to_string())?;
+            let target_pain_point = args["target_pain_point"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'target_pain_point' argument".to_string())?;
+            let mandatory_disclosure = args["mandatory_disclosure"]
+                .as_str()
+                .unwrap_or("Full disclosure: I am working on this tool");
+            let certified_by = args["certified_by"].as_str().unwrap_or("mcp_reviewer");
+
+            let angle = crate::ontology::CertifiedAngle {
+                id: format!("angle_{}", uuid::Uuid::new_v4().simple()),
+                title: title.to_string(),
+                angle_pitch: pitch.to_string(),
+                target_pain_point: target_pain_point.to_string(),
+                mandatory_disclosure: mandatory_disclosure.to_string(),
+                certified_by: certified_by.to_string(),
+                certified_at: chrono::Utc::now().to_rfc3339(),
+                active: true,
+            };
+
+            if let Some(storage) = &self.storage {
+                storage
+                    .save_certified_angle(subreddit, &angle)
+                    .map_err(|e| format!("Failed to save certified angle: {}", e))?;
+
+                // Also update or create ontology in storage
+                let mut ont = storage
+                    .get_community_ontology(subreddit)
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| {
+                        crate::ontology::AutoOntologyBuilder::build_from_threads(
+                            subreddit,
+                            &format!("Domain knowledge for r/{}", subreddit),
+                            &[],
+                        )
+                    });
+                ont.certified_angles.push(angle.clone());
+                storage
+                    .save_community_ontology(&ont)
+                    .map_err(|e| format!("Failed to update community ontology: {}", e))?;
+            }
+
+            return Ok(json!(angle));
+        }
+
+        if name == "reddit_ontology_list" {
+            if let Some(storage) = &self.storage {
+                let subs = storage
+                    .list_community_ontologies()
+                    .map_err(|e| format!("Storage error: {}", e))?;
+                return Ok(json!(subs));
+            } else {
+                return Ok(json!([]));
+            }
         }
 
         let account_param = args["account"].as_str();
@@ -1285,7 +1483,7 @@ mod tests {
             router.clone(),
             account_mgr.clone(),
             action_mgr.clone(),
-            storage,
+            storage.clone(),
             "cid".to_string(),
         ));
 
@@ -1449,5 +1647,74 @@ mod tests {
         assert_eq!(cookie_res_saved["has_cookies"], true);
         assert_eq!(cookie_res_saved["cookie_count"], 1);
         assert_eq!(cookie_res_saved["verified_username"], "my_user");
+
+        // Verify newly added auto-ontology tools
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_ontology_get"));
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_ontology_check_engagable"));
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_ontology_certify_angle"));
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_ontology_list"));
+
+        let server_with_storage = server_with_browser.with_storage(storage.clone());
+
+        // Test reddit_ontology_certify_angle
+        let angle_res = server_with_storage
+            .handle_tool_call(
+                "reddit_ontology_certify_angle",
+                json!({
+                    "subreddit": "vibecoding",
+                    "title": "Local-First Architecture",
+                    "pitch": "Use local sqlite and deterministic state",
+                    "target_pain_point": "wasting hours",
+                    "mandatory_disclosure": "Disclosure: I maintain reddit-agent",
+                    "certified_by": "qa_lead"
+                }),
+            )
+            .await
+            .unwrap();
+        assert_eq!(angle_res["title"], "Local-First Architecture");
+
+        // Test reddit_ontology_get
+        let ont_res = server_with_storage
+            .handle_tool_call("reddit_ontology_get", json!({ "subreddit": "vibecoding" }))
+            .await
+            .unwrap();
+        assert_eq!(ont_res["subreddit"], "vibecoding");
+        assert_eq!(ont_res["certified_angles"].as_array().unwrap().len(), 1);
+
+        // Test reddit_ontology_check_engagable (Safe)
+        let check_safe = server_with_storage
+            .handle_tool_call(
+                "reddit_ontology_check_engagable",
+                json!({
+                    "subreddit": "vibecoding",
+                    "title": "Tired of wasting hours with buggy cloud tools",
+                    "body": "Need a reliable setup."
+                }),
+            )
+            .await
+            .unwrap();
+        assert!(check_safe.get("CertifiedSafe").is_some());
+
+        // Test reddit_ontology_check_engagable (Spam / Taboo Violation)
+        let check_spam = server_with_storage
+            .handle_tool_call(
+                "reddit_ontology_check_engagable",
+                json!({
+                    "subreddit": "vibecoding",
+                    "title": "Join our upvote for upvote group!",
+                    "body": "Free upvotes!"
+                }),
+            )
+            .await
+            .unwrap();
+        assert!(check_spam.get("HighRiskViolation").is_some());
+
+        // Test reddit_ontology_list
+        let list_res = server_with_storage
+            .handle_tool_call("reddit_ontology_list", json!({}))
+            .await
+            .unwrap();
+        let list_arr = list_res.as_array().unwrap();
+        assert!(list_arr.iter().any(|s| s == "vibecoding"));
     }
 }

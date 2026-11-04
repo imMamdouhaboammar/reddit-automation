@@ -124,8 +124,57 @@ pub enum Commands {
         #[arg(long, help = "Comma-separated subreddits to prioritize")]
         subreddits: Option<String>,
     },
+    /// Auto-Ontology: inspect, mine, and certify community semantic concepts and rules
+    Ontology {
+        #[command(subcommand)]
+        subcommand: OntologySubcommand,
+    },
     /// Start Model Context Protocol (MCP) server over Stdio
     Mcp,
+}
+
+#[derive(Subcommand)]
+pub enum OntologySubcommand {
+    /// Generate or update a Community Ontology by mining subreddits
+    Generate {
+        #[arg(long, short, help = "Subreddit name (e.g. 'vibecoding', 'SaaS')")]
+        subreddit: String,
+        #[arg(long, default_value = "Community domain knowledge", help = "Description of the community")]
+        description: String,
+        #[arg(long, help = "Path to optional JSON file containing RedditThread items")]
+        threads_file: Option<PathBuf>,
+    },
+    /// Inspect terms, rules, and relationships for a community ontology
+    Inspect {
+        #[arg(long, short, help = "Subreddit name")]
+        subreddit: String,
+    },
+    /// Preflight feasibility check for a thread against community ontology
+    Check {
+        #[arg(long, short, help = "Subreddit name")]
+        subreddit: String,
+        #[arg(long, help = "Thread title")]
+        title: String,
+        #[arg(long, default_value = "", help = "Thread body text")]
+        body: String,
+    },
+    /// Certify an engagement angle for ethical value-first replies
+    CertifyAngle {
+        #[arg(long, short, help = "Subreddit name")]
+        subreddit: String,
+        #[arg(long, help = "Angle title")]
+        title: String,
+        #[arg(long, help = "Approved pitch or technical takeaway")]
+        pitch: String,
+        #[arg(long, help = "Target pain point or keyword")]
+        pain_point: String,
+        #[arg(long, default_value = "Full disclosure: I am working on this tool", help = "Mandatory affiliation disclosure")]
+        disclosure: String,
+        #[arg(long, default_value = "cli_user", help = "Name of the human reviewer certifying this angle")]
+        certified_by: String,
+    },
+    /// List all subreddits with stored community ontologies
+    List,
 }
 
 #[derive(Subcommand)]
@@ -1407,6 +1456,7 @@ impl AppContext {
                         composite_score: 0.85,
                         detected_signals: vec![crate::agents::opportunity::OpportunitySignal::RecommendationAsk],
                         opportunity_reason: "OP is looking for assistance".to_string(),
+                        preflight_verdict: None,
                     };
 
                     match OpportunityWorker::draft_reply(&sample_opp, &sample_product) {
@@ -1527,6 +1577,213 @@ impl AppContext {
                 println!("  └── references/reddit_evidence.md");
             }
 
+            Commands::Ontology { subcommand } => match subcommand {
+                OntologySubcommand::Generate {
+                    subreddit,
+                    description,
+                    threads_file,
+                } => {
+                    let sub_clean = subreddit.trim_start_matches("r/").to_string();
+                    println!("🧠 Mining community ontology for r/{}...", sub_clean);
+
+                    let threads: Vec<RedditThread> = if let Some(path) = threads_file {
+                        let content = std::fs::read_to_string(&path)
+                            .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", path.display(), e))?;
+                        serde_json::from_str(&content)
+                            .map_err(|e| anyhow::anyhow!("Failed to parse {}: {}", path.display(), e))?
+                    } else {
+                        println!("📡 Fetching public threads via keyless driver...");
+                        let keyless = RedditKeylessDriver::new();
+                        match keyless.fetch_subreddit_listing(&sub_clean, "hot", 25).await {
+                            Ok(fetched_threads) => fetched_threads,
+                            Err(e) => {
+                                println!("⚠️  Keyless driver notice: {} (generating baseline rules and structure)", e);
+                                Vec::new()
+                            }
+                        }
+                    };
+
+                    let ontology = crate::ontology::AutoOntologyBuilder::build_from_threads(
+                        &sub_clean,
+                        &description,
+                        &threads,
+                    );
+
+                    self.storage.save_community_ontology(&ontology)
+                        .map_err(|e| anyhow::anyhow!("Storage error: {}", e))?;
+
+                    println!("✅ Successfully compiled and persisted Community Ontology for r/{}", sub_clean);
+                    println!("- Discovered Terms:   {}", ontology.terms.len());
+                    println!("- Default Rules:      {}", ontology.rules.len());
+                    println!("- Relationships:      {}", ontology.relationships.len());
+                    println!("- Certified Angles:   {}", ontology.certified_angles.len());
+                }
+
+                OntologySubcommand::Inspect { subreddit } => {
+                    let sub_clean = subreddit.trim_start_matches("r/").to_string();
+                    match self.storage.get_community_ontology(&sub_clean)? {
+                        Some(ont) => {
+                            println!("\n=== Community Ontology: r/{} (v{}) ===", ont.subreddit, ont.version);
+                            println!("Description: {}", ont.description);
+                            println!("Updated:     {}\n", ont.updated_at);
+
+                            println!("--- Rules & Constraints ({}) ---", ont.rules.len());
+                            for rule in &ont.rules {
+                                println!("* [{:?}] {}: {}", rule.severity, rule.rule_name, rule.description);
+                                if !rule.forbidden_phrases.is_empty() {
+                                    println!("  Forbidden: {}", rule.forbidden_phrases.join(", "));
+                                }
+                            }
+
+                            println!("\n--- Certified Angles ({}) ---", ont.certified_angles.len());
+                            for angle in &ont.certified_angles {
+                                println!("* [{}] {} (By: {})", if angle.active { "ACTIVE" } else { "INACTIVE" }, angle.title, angle.certified_by);
+                                println!("  Target Pain: {}", angle.target_pain_point);
+                                println!("  Pitch:       {}", angle.angle_pitch);
+                                println!("  Disclosure:  {}", angle.mandatory_disclosure);
+                            }
+
+                            println!("\n--- Sample Community Terms ({}) ---", ont.terms.len());
+                            for term in ont.terms.iter().take(15) {
+                                println!("* [{:?}] {} (Freq: {}, Sentiment: {:.2}, Certified: {})",
+                                    term.category, term.term, term.frequency, term.sentiment_bias, term.certified
+                                );
+                            }
+                        }
+                        None => {
+                            println!("No ontology found for r/{}. Run `reddit-agent ontology generate --subreddit {}` first.", sub_clean, sub_clean);
+                        }
+                    }
+                }
+
+                OntologySubcommand::Check {
+                    subreddit,
+                    title,
+                    body,
+                } => {
+                    let sub_clean = subreddit.trim_start_matches("r/").to_string();
+                    let ontology = self.storage.get_community_ontology(&sub_clean)?
+                        .unwrap_or_else(|| {
+                            crate::ontology::AutoOntologyBuilder::build_from_threads(
+                                &sub_clean,
+                                &format!("Domain knowledge for r/{}", sub_clean),
+                                &[],
+                            )
+                        });
+
+                    let thread = RedditThread {
+                        id: "cli_eval".to_string(),
+                        subreddit: sub_clean,
+                        title,
+                        body,
+                        author: "eval".to_string(),
+                        created_utc: chrono::Utc::now().timestamp(),
+                        num_comments: 0,
+                        is_locked: false,
+                        is_archived: false,
+                        url: "".to_string(),
+                    };
+
+                    let context = ProductContext::default();
+                    let verdict = crate::ontology::PreflightAnswerabilityGate::check_engagable(
+                        &thread,
+                        &ontology,
+                        &context,
+                    );
+
+                    println!("\n=== Preflight Answerability Check ===");
+                    match verdict {
+                        crate::ontology::EngagementVerdict::CertifiedSafe { angle, matched_terms, alignment_score } => {
+                            println!("Verdict: ✅ CERTIFIED SAFE");
+                            println!("Alignment Score: {:.2}", alignment_score);
+                            println!("Matched Terms:   {}", matched_terms.join(", "));
+                            println!("Approved Angle:  {}", angle.title);
+                            println!("Approved Pitch:  {}", angle.angle_pitch);
+                            println!("Disclosure:      {}", angle.mandatory_disclosure);
+                        }
+                        crate::ontology::EngagementVerdict::HighRiskViolation { rule_name, detected_phrase, severity } => {
+                            println!("Verdict: ❌ HIGH RISK VIOLATION (FAIL-CLOSED)");
+                            println!("Rule:            {}", rule_name);
+                            println!("Severity:        {:?}", severity);
+                            println!("Detected Phrase: '{}'", detected_phrase);
+                        }
+                        crate::ontology::EngagementVerdict::UnanswerableMissingConcepts { missing_concepts, rationale } => {
+                            println!("Verdict: ⚠️ UNANSWERABLE / OUT OF SCOPE");
+                            println!("Rationale:       {}", rationale);
+                            println!("Missing Concepts: {}", missing_concepts.join(", "));
+                        }
+                        crate::ontology::EngagementVerdict::UncertifiedAngleRequired { detected_pain_point, suggested_pitch } => {
+                            println!("Verdict: 🛑 UNCERTIFIED ANGLE REQUIRED");
+                            println!("Detected Pain:   {}", detected_pain_point);
+                            println!("Suggested Pitch: {}", suggested_pitch);
+                            println!("\nAction Required: Human reviewer must certify this angle before automation can engage.");
+                        }
+                    }
+                }
+
+                OntologySubcommand::CertifyAngle {
+                    subreddit,
+                    title,
+                    pitch,
+                    pain_point,
+                    disclosure,
+                    certified_by,
+                } => {
+                    let sub_clean = subreddit.trim_start_matches("r/").to_string();
+                    let angle = crate::ontology::CertifiedAngle {
+                        id: format!("angle_{}", uuid::Uuid::new_v4().simple()),
+                        title,
+                        angle_pitch: pitch,
+                        target_pain_point: pain_point,
+                        mandatory_disclosure: disclosure,
+                        certified_by,
+                        certified_at: chrono::Utc::now().to_rfc3339(),
+                        active: true,
+                    };
+
+                    self.storage.save_certified_angle(&sub_clean, &angle)
+                        .map_err(|e| anyhow::anyhow!("Failed to save angle: {}", e))?;
+
+                    let mut ont = self.storage.get_community_ontology(&sub_clean)?
+                        .unwrap_or_else(|| {
+                            crate::ontology::AutoOntologyBuilder::build_from_threads(
+                                &sub_clean,
+                                &format!("Domain knowledge for r/{}", sub_clean),
+                                &[],
+                            )
+                        });
+                    ont.certified_angles.push(angle.clone());
+                    self.storage.save_community_ontology(&ont)
+                        .map_err(|e| anyhow::anyhow!("Failed to update ontology: {}", e))?;
+
+                    println!("✅ Certified and activated angle '{}' for r/{}", angle.title, sub_clean);
+                    println!("- ID:         {}", angle.id);
+                    println!("- Target:     {}", angle.target_pain_point);
+                    println!("- Pitch:      {}", angle.angle_pitch);
+                    println!("- Disclosure: {}", angle.mandatory_disclosure);
+                    println!("- Certified:  {} at {}", angle.certified_by, angle.certified_at);
+                }
+
+                OntologySubcommand::List => {
+                    let subs = self.storage.list_community_ontologies()
+                        .map_err(|e| anyhow::anyhow!("Storage error: {}", e))?;
+                    println!("\n=== Stored Community Ontologies ({}) ===", subs.len());
+                    if subs.is_empty() {
+                        println!("No ontologies stored yet. Run `reddit-agent ontology generate --subreddit <sub_name>` to begin.");
+                    } else {
+                        for sub in subs {
+                            if let Ok(Some(ont)) = self.storage.get_community_ontology(&sub) {
+                                println!("* r/{} — Terms: {}, Rules: {}, Certified Angles: {}",
+                                    ont.subreddit, ont.terms.len(), ont.rules.len(), ont.certified_angles.len()
+                                );
+                            } else {
+                                println!("* r/{}", sub);
+                            }
+                        }
+                    }
+                }
+            }
+
             Commands::Mcp => {
                 let server = McpServer::new(
                     self.account_manager,
@@ -1534,7 +1791,8 @@ impl AppContext {
                     self.action_manager,
                     self.issue_engine,
                 )
-                .with_browser_driver(self.browser_driver);
+                .with_browser_driver(self.browser_driver)
+                .with_storage(self.storage);
                 server.run_stdio_server().await?;
             }
         }
