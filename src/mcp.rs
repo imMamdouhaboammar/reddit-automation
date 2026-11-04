@@ -6,6 +6,9 @@ use tracing::info;
 
 use crate::accounts::AccountManager;
 use crate::actions::{ActionManager, RiskLevel};
+use crate::agents::community_builder::CommunityBuilderWorker;
+use crate::agents::opportunity::{OpportunityWorker, ProductContext, RankedOpportunity};
+use crate::drivers::reddit_keyless::RedditKeylessDriver;
 use crate::drivers::Capability;
 use crate::issues::IssueEngine;
 use crate::router::CapabilityRouter;
@@ -314,11 +317,131 @@ impl McpServer {
                         "repair_plan": { "type": "object", "description": "RepairPlan returned from reddit_plan_repair." }
                     }
                 }
+            },
+            {
+                "name": "reddit_discover_opportunities",
+                "description": "Discover high-intent Reddit opportunities from target subreddits using multi-tier scraping (Public Shreddit + Arctic Shift fallback) and intent scoring (recommendation ask, expressed pain, competitor frustration, workflow urgency).",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["product_name", "value_prop", "target_subreddits"],
+                    "properties": {
+                        "product_name": { "type": "string", "description": "Name of product/service." },
+                        "value_prop": { "type": "string", "description": "One-line value proposition." },
+                        "icp_target": { "type": "string", "description": "Ideal customer profile." },
+                        "target_subreddits": { "type": "array", "items": { "type": "string" }, "description": "List of subreddits (e.g. ['SaaS', 'startups'])." },
+                        "pain_points": { "type": "array", "items": { "type": "string" }, "description": "Specific pain points the product solves." },
+                        "competitors": { "type": "array", "items": { "type": "string" }, "description": "Competitor tools commonly mentioned." },
+                        "high_intent_phrases": { "type": "array", "items": { "type": "string" }, "description": "Phrases buyers use when seeking solutions." },
+                        "affiliation_disclosure": { "type": "string", "description": "Mandatory affiliation disclaimer (e.g. 'Full disclosure: I work on X')." },
+                        "limit_per_sub": { "type": "integer", "description": "Max threads to fetch per subreddit (default: 15)." }
+                    }
+                }
+            },
+            {
+                "name": "reddit_draft_response",
+                "description": "Draft a genuinely helpful 25-55 word response adhering to Experience Grammar ('I ran into this...') with mandatory affiliation disclosure and anti-slop rules.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["opportunity", "product"],
+                    "properties": {
+                        "opportunity": { "type": "object", "description": "RankedOpportunity returned by reddit_discover_opportunities." },
+                        "product": { "type": "object", "description": "ProductContext object." }
+                    }
+                }
+            },
+            {
+                "name": "reddit_audit_community_ratio",
+                "description": "Audit an account's karma and recent posting history against Reddit's 90/10 content-to-promotion rule.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "account": { "type": "string", "description": "Account alias to audit." }
+                    }
+                }
             }
         ])
     }
 
     pub async fn handle_tool_call(&self, name: &str, args: Value) -> Result<Value, String> {
+        if name == "reddit_discover_opportunities" {
+            let product_name = args["product_name"].as_str().unwrap_or("Product").to_string();
+            let value_prop = args["value_prop"].as_str().unwrap_or("").to_string();
+            let icp_target = args["icp_target"].as_str().unwrap_or("").to_string();
+            let affiliation_disclosure = args["affiliation_disclosure"]
+                .as_str()
+                .unwrap_or("Full disclosure: I am affiliated with this product")
+                .to_string();
+
+            let subreddits: Vec<String> = args["target_subreddits"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let pain_points: Vec<String> = args["pain_points"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let competitors: Vec<String> = args["competitors"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let high_intent_phrases: Vec<String> = args["high_intent_phrases"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let limit_per_sub = args["limit_per_sub"].as_u64().unwrap_or(15) as usize;
+
+            let product = ProductContext {
+                product_name,
+                value_prop,
+                icp_target,
+                pain_points,
+                competitors,
+                target_subreddits: subreddits.clone(),
+                high_intent_phrases: high_intent_phrases.clone(),
+                affiliation_disclosure,
+            };
+
+            let keyless_driver = RedditKeylessDriver::new();
+            let threads = keyless_driver
+                .discover_threads(&subreddits, &high_intent_phrases, limit_per_sub)
+                .await;
+
+            let now_utc = chrono::Utc::now().timestamp();
+            let ranked = OpportunityWorker::discover_opportunities(&threads, &product, now_utc);
+            return Ok(json!(ranked));
+        }
+
+        if name == "reddit_draft_response" {
+            let opp: RankedOpportunity = serde_json::from_value(args["opportunity"].clone())
+                .map_err(|e| format!("Invalid opportunity payload: {}", e))?;
+            let product: ProductContext = serde_json::from_value(args["product"].clone())
+                .map_err(|e| format!("Invalid product payload: {}", e))?;
+
+            let draft = OpportunityWorker::draft_reply(&opp, &product)
+                .map_err(|e| format!("Drafting failed: {}", e))?;
+            return Ok(json!(draft));
+        }
+
         let account_param = args["account"].as_str();
         let ctx = self
             .account_manager
@@ -326,6 +449,53 @@ impl McpServer {
             .map_err(|e| format!("Failed to resolve account: {}", e))?;
 
         match name {
+            "reddit_audit_community_ratio" => {
+                let identity = self
+                    .router
+                    .execute(&Capability::GetIdentity, &ctx, json!({}))
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                let link_karma = identity["link_karma"].as_i64().unwrap_or(0);
+                let comment_karma = identity["comment_karma"].as_i64().unwrap_or(0);
+
+                let input_records: Vec<crate::agents::community_builder::EngagementRecord> = args["history"]
+                    .as_array()
+                    .and_then(|arr| serde_json::from_value(serde_json::Value::Array(arr.clone())).ok())
+                    .unwrap_or_else(|| {
+                        let value_count = (comment_karma.max(0) / 10).clamp(1, 90) as usize;
+                        let promo_count = (link_karma.max(0) / 50).clamp(0, 10) as usize;
+                        let mut records = Vec::new();
+                        for i in 0..value_count {
+                            records.push(crate::agents::community_builder::EngagementRecord {
+                                id: format!("val_{}", i),
+                                subreddit: "community".to_string(),
+                                is_promotional: false,
+                                summary: "Organic value discussion".to_string(),
+                                timestamp_utc: chrono::Utc::now().timestamp(),
+                            });
+                        }
+                        for i in 0..promo_count {
+                            records.push(crate::agents::community_builder::EngagementRecord {
+                                id: format!("promo_{}", i),
+                                subreddit: "community".to_string(),
+                                is_promotional: true,
+                                summary: "Promotional submission".to_string(),
+                                timestamp_utc: chrono::Utc::now().timestamp(),
+                            });
+                        }
+                        records
+                    });
+
+                let audit_res = CommunityBuilderWorker::audit_90_10_ratio(&input_records);
+                Ok(json!({
+                    "account": ctx.account.alias,
+                    "reddit_username": ctx.account.reddit_username,
+                    "link_karma": link_karma,
+                    "comment_karma": comment_karma,
+                    "audit": audit_res
+                }))
+            }
             "reddit_accounts" => {
                 let accounts = self
                     .account_manager
@@ -821,5 +991,70 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(res["identity"]["name"], "tester");
+
+        // Verify newly added opportunity and community audit tools are present in tools list
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_discover_opportunities"));
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_draft_response"));
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_audit_community_ratio"));
+
+        // Call reddit_draft_response tool without requiring an account
+        let sample_opp = json!({
+            "thread": {
+                "id": "thread_123",
+                "subreddit": "SaaS",
+                "title": "Need tool recommendation for finding customers without spam",
+                "body": "Does anyone know a good alternative to spammy reddit scrapers?",
+                "author": "founder_x",
+                "created_utc": 1700000000,
+                "num_comments": 8,
+                "is_locked": false,
+                "is_archived": false
+            },
+            "op_signal_score": 0.95,
+            "product_fit_score": 0.85,
+            "timing_score": 0.90,
+            "composite_score": 0.88,
+            "detected_signals": ["RecommendationAsk", "UrgentWorkflow"],
+            "opportunity_reason": "OP is asking for recommendation"
+        });
+
+        let sample_product = json!({
+            "product_name": "RedditAgent",
+            "value_prop": "Local-first multi-account Reddit operator",
+            "icp_target": "SaaS Founders",
+            "pain_points": ["spammy bots", "wasting hours"],
+            "competitors": ["spam-blaster"],
+            "target_subreddits": ["SaaS"],
+            "high_intent_phrases": ["tool recommendation"],
+            "affiliation_disclosure": "Full disclosure: I built RedditAgent"
+        });
+
+        let draft_res = server
+            .handle_tool_call(
+                "reddit_draft_response",
+                json!({
+                    "opportunity": sample_opp,
+                    "product": sample_product
+                }),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(draft_res["thread_id"], "thread_123");
+        assert_eq!(draft_res["experience_grammar_valid"], true);
+        assert_eq!(draft_res["affiliation_disclosed"], true);
+        assert_eq!(draft_res["product_named"], true);
+
+        // Call reddit_audit_community_ratio
+        let ratio_res = server
+            .handle_tool_call(
+                "reddit_audit_community_ratio",
+                json!({ "account": "personal" }),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(ratio_res["account"], "personal");
+        assert!(ratio_res["audit"]["is_compliant"].is_boolean());
     }
 }

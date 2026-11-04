@@ -183,7 +183,9 @@ impl Driver for RedditApiDriver {
             | Capability::ManageSaved
             | Capability::ManageHidden
             | Capability::InspectAccountHealth => true,
-            Capability::BrowserSettings => false,
+            Capability::BrowserSettings
+            | Capability::KeylessSearch
+            | Capability::DiscoverOpportunities => false,
         }
     }
 
@@ -638,6 +640,14 @@ impl Driver for RedditApiDriver {
 
             Capability::BrowserSettings => {
                 Err(DriverError::Unsupported(Capability::BrowserSettings))
+            }
+
+            Capability::KeylessSearch => {
+                Err(DriverError::Unsupported(Capability::KeylessSearch))
+            }
+
+            Capability::DiscoverOpportunities => {
+                Err(DriverError::Unsupported(Capability::DiscoverOpportunities))
             }
         }
     }

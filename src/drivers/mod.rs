@@ -6,6 +6,7 @@ use thiserror::Error;
 
 pub mod browser;
 pub mod reddit_api;
+pub mod reddit_keyless;
 
 #[derive(Error, Debug)]
 pub enum DriverError {
@@ -55,6 +56,8 @@ pub enum Capability {
     ManageHidden,
     InspectAccountHealth,
     BrowserSettings,
+    DiscoverOpportunities,
+    KeylessSearch,
 }
 
 impl fmt::Display for Capability {

@@ -6,10 +6,12 @@ use std::time::Duration;
 
 use crate::accounts::AccountManager;
 use crate::actions::{ActionManager, RiskLevel};
+use crate::agents::opportunity::{OpportunityWorker, ProductContext, RankedOpportunity, RedditThread};
 use crate::audit::AuditLogger;
 use crate::auth::AuthManager;
 use crate::drivers::browser::BrowserDriver;
 use crate::drivers::reddit_api::RedditApiDriver;
+use crate::drivers::reddit_keyless::RedditKeylessDriver;
 use crate::drivers::Capability;
 use crate::issues::IssueEngine;
 use crate::mcp::McpServer;
@@ -83,8 +85,39 @@ pub enum Commands {
         #[command(subcommand)]
         subcommand: BrowserSubcommand,
     },
+    /// Discover high-intent Reddit opportunities and draft helpful replies
+    Opportunity {
+        #[command(subcommand)]
+        subcommand: OpportunitySubcommand,
+    },
     /// Start Model Context Protocol (MCP) server over Stdio
     Mcp,
+}
+
+#[derive(Subcommand)]
+pub enum OpportunitySubcommand {
+    /// Discover high-intent opportunities from a subreddit
+    Discover {
+        #[arg(long, short, help = "Target subreddit (e.g. SaaS)")]
+        subreddit: String,
+        #[arg(long, default_value = "MyProduct", help = "Product or tool name")]
+        product: String,
+        #[arg(long, default_value = "Automates workflow with local-first security")]
+        value_prop: String,
+        #[arg(long, default_value = "10")]
+        limit: usize,
+    },
+    /// Draft an experience-grammar reply adhering to honest disclosure
+    Draft {
+        #[arg(long, help = "Thread title or question asked")]
+        title: String,
+        #[arg(long, default_value = "")]
+        body: String,
+        #[arg(long, default_value = "MyProduct")]
+        product: String,
+        #[arg(long, default_value = "Full disclosure: I work on MyProduct")]
+        disclosure: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -769,6 +802,124 @@ impl AppContext {
                     let ctx = self.account_manager.get_account_context(account_override)?;
                     let url = self.browser_driver.open_settings(&ctx, &section).await?;
                     println!("Navigated to {}", url);
+                }
+            },
+
+            Commands::Opportunity { subcommand } => match subcommand {
+                OpportunitySubcommand::Discover {
+                    subreddit,
+                    product,
+                    value_prop,
+                    limit,
+                } => {
+                    println!("Scanning r/{} for high-intent opportunities...", subreddit);
+                    let product_ctx = ProductContext {
+                        product_name: product,
+                        value_prop,
+                        icp_target: "Reddit community members seeking solutions".to_string(),
+                        pain_points: vec![
+                            "wasting time".to_string(),
+                            "manual work".to_string(),
+                            "flaky tools".to_string(),
+                        ],
+                        competitors: vec!["generic-tool".to_string()],
+                        target_subreddits: vec![subreddit.clone()],
+                        high_intent_phrases: vec![
+                            "recommendation".to_string(),
+                            "alternative".to_string(),
+                            "what tool".to_string(),
+                        ],
+                        affiliation_disclosure: "Full disclosure: I am affiliated with this tool"
+                            .to_string(),
+                    };
+
+                    let keyless = RedditKeylessDriver::new();
+                    let threads = keyless
+                        .discover_threads(
+                            &[subreddit],
+                            &product_ctx.high_intent_phrases,
+                            limit,
+                        )
+                        .await;
+
+                    let now = chrono::Utc::now().timestamp();
+                    let ranked = OpportunityWorker::discover_opportunities(
+                        &threads,
+                        &product_ctx,
+                        now,
+                    );
+
+                    println!("\nFound {} ranked opportunities:\n", ranked.len());
+                    for (i, opp) in ranked.iter().take(5).enumerate() {
+                        println!(
+                            "{}. [Score: {:.2}] {} (r/{})",
+                            i + 1,
+                            opp.composite_score,
+                            opp.thread.title,
+                            opp.thread.subreddit
+                        );
+                        println!("   Why: {}", opp.opportunity_reason);
+                        println!(
+                            "   Signals: {:?} | Comments: {}",
+                            opp.detected_signals, opp.thread.num_comments
+                        );
+                        println!();
+                    }
+                }
+
+                OpportunitySubcommand::Draft {
+                    title,
+                    body,
+                    product,
+                    disclosure,
+                } => {
+                    let sample_thread = RedditThread {
+                        id: "cli_draft_target".to_string(),
+                        subreddit: "community".to_string(),
+                        title: title.clone(),
+                        body: body.clone(),
+                        author: "peer_user".to_string(),
+                        created_utc: chrono::Utc::now().timestamp(),
+                        num_comments: 5,
+                        is_locked: false,
+                        is_archived: false,
+                    };
+
+                    let sample_product = ProductContext {
+                        product_name: product,
+                        value_prop: "Helpful developer tool".to_string(),
+                        icp_target: "Developers and community builders".to_string(),
+                        pain_points: vec!["friction".to_string(), "manual work".to_string()],
+                        competitors: vec![],
+                        target_subreddits: vec!["community".to_string()],
+                        high_intent_phrases: vec!["recommendation".to_string()],
+                        affiliation_disclosure: disclosure,
+                    };
+
+                    let sample_opp = RankedOpportunity {
+                        thread: sample_thread,
+                        op_signal_score: 0.90,
+                        product_fit_score: 0.80,
+                        timing_score: 0.85,
+                        composite_score: 0.85,
+                        detected_signals: vec![crate::agents::opportunity::OpportunitySignal::RecommendationAsk],
+                        opportunity_reason: "OP is looking for assistance".to_string(),
+                    };
+
+                    match OpportunityWorker::draft_reply(&sample_opp, &sample_product) {
+                        Ok(draft) => {
+                            println!("\n=== Experience Grammar Draft (Words: {}) ===", draft.word_count);
+                            println!("{}", draft.draft_text);
+                            println!("\nChecks passed:");
+                            println!("- Experience grammar valid: {}", draft.experience_grammar_valid);
+                            println!("- Product named:           {}", draft.product_named);
+                            println!("- Affiliation disclosed:   {}", draft.affiliation_disclosed);
+                            println!("- Referenced detail:       '{}'", draft.concrete_detail_referenced);
+                        }
+                        Err(err) => {
+                            eprintln!("Draft generation failed: {}", err);
+                        }
+                    }
                 }
             },
 
