@@ -1,6 +1,6 @@
 # Autonomous Cloud Run Agent & Gemini 4 Argon Architecture Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Transform the local `reddit-agent` CLI into an autonomous, 24/7 cloud-native agent on Google Cloud Run orchestrated by Gemini 4 Argon via Google Cloud Vertex AI, featuring a dual-mode egress architecture (Split-Plane Local Relay or Official OAuth Allowlisting) to eliminate residential proxy fees and guarantee zero automated account bans.
 
@@ -82,7 +82,7 @@ flowchart TD
 - Consumes: `reddit_agent::opportunity::RedditThread`, `gcloud` / GCP ADC token.
 - Produces: `VertexAiClient::generate_anti_slop_reply(&self, thread: &RedditThread, angle: &str) -> Result<String, AiError>`.
 
-- [ ] **Step 1: Write the failing integration test**
+- [x] **Step 1: Write the failing integration test**
 
 ```rust
 #[tokio::test]
@@ -105,21 +105,21 @@ async fn test_vertex_ai_anti_slop_synthesis() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cargo test test_vertex_ai_anti_slop_synthesis`
 Expected: FAIL (module `ai` not found)
 
-- [ ] **Step 3: Implement `VertexAiClient` and Anti-Slop System Prompt in `src/ai/vertex.rs`**
+- [x] **Step 3: Implement `VertexAiClient` and Anti-Slop System Prompt in `src/ai/vertex.rs`**
 
 Use Google Cloud Vertex AI REST API endpoint `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/publishers/google/models/gemini-1.5-pro:generateContent` with ADC token resolution.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cargo test test_vertex_ai_anti_slop_synthesis`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ai/ tests/test_vertex_ai.rs
@@ -139,7 +139,7 @@ git commit -m "feat(ai): implement vertex ai gemini integration with anti-slop p
 - Consumes: GCP Secret Manager API / JSON secret payload.
 - Produces: `GcpSecretManagerStore: CredentialStore` providing seamless fallback when running in Linux containers without macOS Keychain.
 
-- [ ] **Step 1: Write the failing test for headless secret resolution**
+- [x] **Step 1: Write the failing test for headless secret resolution**
 
 ```rust
 #[test]
@@ -150,21 +150,21 @@ fn test_headless_credential_store_fallback() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cargo test test_headless_credential_store_fallback`
 Expected: FAIL (type `GcpSecretManagerStore` not found)
 
-- [ ] **Step 3: Implement `GcpSecretManagerStore` in `src/auth/secret_manager.rs`**
+- [x] **Step 3: Implement `GcpSecretManagerStore` in `src/auth/secret_manager.rs`**
 
 Implement `CredentialStore` trait reading from `GCP_SECRETS_MOUNT_PATH` or Google Cloud Secret Manager REST API using ADC.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cargo test test_headless_credential_store_fallback`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/auth/secret_manager.rs src/auth.rs tests/test_secret_manager.rs
@@ -184,7 +184,7 @@ git commit -m "feat(auth): add headless gcp secret manager credential provider"
 - Consumes: ActionPlan, Local Relay WebSocket handle or Reddit Developer Client Credentials.
 - Produces: `EgressRouter::dispatch_action(&self, plan: &ActionPlan) -> Result<Value, DriverError>`.
 
-- [ ] **Step 1: Write the failing test for Split-Plane local routing**
+- [x] **Step 1: Write the failing test for Split-Plane local routing**
 
 ```rust
 #[tokio::test]
@@ -196,21 +196,21 @@ async fn test_split_plane_dispatches_to_local_relay() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cargo test test_split_plane_dispatches_to_local_relay`
 Expected: FAIL (type `EgressRouter` not defined)
 
-- [ ] **Step 3: Implement `EgressRouter` and WebSocket relay protocol in `src/drivers/split_plane.rs`**
+- [x] **Step 3: Implement `EgressRouter` and WebSocket relay protocol in `src/drivers/split_plane.rs`**
 
 Support Mode A (Relay through local authenticated worker) and Mode B (Direct datacenter egress using OAuth Client Credentials).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cargo test test_split_plane_dispatches_to_local_relay`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/drivers/split_plane.rs src/router.rs tests/test_split_plane_router.rs
@@ -230,7 +230,7 @@ git commit -m "feat(egress): implement split-plane relay and dual-mode egress ro
 - Consumes: SQLite engagement logs, current local timezone time.
 - Produces: `VelocityGovernor::can_interact_now(&self) -> Result<InteractionVerdict, GovernorError>`.
 
-- [ ] **Step 1: Write the failing test for Circadian sleep and rate limits**
+- [x] **Step 1: Write the failing test for Circadian sleep and rate limits**
 
 ```rust
 #[test]
@@ -242,21 +242,21 @@ fn test_velocity_governor_enforces_sleep_and_daily_cap() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cargo test test_velocity_governor_enforces_sleep_and_daily_cap`
 Expected: FAIL (`VelocityGovernor` not defined)
 
-- [ ] **Step 3: Implement `VelocityGovernor` in `src/agents/velocity.rs`**
+- [x] **Step 3: Implement `VelocityGovernor` in `src/agents/velocity.rs`**
 
 Enforce 45-90 min dynamic jitter, 8 actions/24h ceiling, and 23:00-07:00 sleep blackout.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cargo test test_velocity_governor_enforces_sleep_and_daily_cap`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/agents/velocity.rs src/agents/orchestrator.rs tests/test_velocity_governor.rs
@@ -277,7 +277,7 @@ git commit -m "feat(governor): implement circadian sleep mode and velocity jitte
 - Consumes: Rust binary + Bun scripts + Cloud Run HTTP trigger entrypoint.
 - Produces: Minimal container image (< 60MB) listening on `PORT` for Cloud Scheduler webhook.
 
-- [ ] **Step 1: Write minimal multi-stage `Dockerfile`**
+- [x] **Step 1: Write minimal multi-stage `Dockerfile`**
 
 ```dockerfile
 FROM rust:1.80-alpine AS builder
@@ -296,16 +296,16 @@ EXPOSE 8080
 ENTRYPOINT ["reddit-agent", "mcp"]
 ```
 
-- [ ] **Step 2: Add Cloud Scheduler trigger script in `scripts/setup_cloud_scheduler.sh`**
+- [x] **Step 2: Add Cloud Scheduler trigger script in `scripts/setup_cloud_scheduler.sh`**
 
 Setup recurring job with randomized jitter on Google Cloud Scheduler targeting the Cloud Run service URL.
 
-- [ ] **Step 3: Verify local build and container smoke test**
+- [x] **Step 3: Verify local build and container smoke test**
 
 Run: `bun run typecheck && cargo check`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Dockerfile scripts/deploy_cloud_run.sh scripts/setup_cloud_scheduler.sh
