@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod actions;
 pub mod agents;
+pub mod ai;
 pub mod audit;
 pub mod auth;
 pub mod cli;
