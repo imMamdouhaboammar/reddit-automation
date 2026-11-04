@@ -108,6 +108,22 @@ pub enum Commands {
         )]
         output_dir: PathBuf,
     },
+    /// Dynamically route natural language intent to execution DAG (OmniSkill Agent Router)
+    Route {
+        #[arg(help = "User request or prompt in Arabic, English, etc.")]
+        prompt: String,
+        #[arg(long, default_value = "json", help = "Format: json, text")]
+        format: String,
+    },
+    /// Master Orchestrator: execute autonomous goal wave-by-wave via Tool-Agents
+    Orchestrate {
+        #[arg(help = "User goal or request to orchestrate")]
+        prompt: String,
+        #[arg(long, help = "Product or tool name")]
+        product: Option<String>,
+        #[arg(long, help = "Comma-separated subreddits to prioritize")]
+        subreddits: Option<String>,
+    },
     /// Start Model Context Protocol (MCP) server over Stdio
     Mcp,
 }
@@ -186,9 +202,21 @@ pub enum AccountSubcommand {
         #[arg(long, help = "Space or comma-separated OAuth scopes")]
         scopes: Option<String>,
     },
-    /// Open visible Chrome window for manual login
+    /// Open visible Chrome window for manual login and account takeover
     Login {
         alias: String,
+        #[arg(long, default_value = "180")]
+        timeout_secs: u64,
+    },
+    /// Inspect session cookies stored in OS Keychain
+    Cookies {
+        alias: String,
+    },
+    /// Interactive account takeover with custom starting URL
+    Takeover {
+        alias: String,
+        #[arg(long, help = "Optional target URL to navigate to")]
+        url: Option<String>,
         #[arg(long, default_value = "180")]
         timeout_secs: u64,
     },
@@ -263,8 +291,26 @@ pub enum IssueSubcommand {
 
 #[derive(Subcommand)]
 pub enum BrowserSubcommand {
-    /// Open browser to Reddit
-    Open,
+    /// Open Obscura stealth browser to Reddit (restores Keychain cookies)
+    Open {
+        #[arg(long, help = "Account alias to use")]
+        alias: Option<String>,
+        #[arg(long, help = "Custom URL to navigate to")]
+        url: Option<String>,
+    },
+    /// Browse Reddit using human behavior simulation and output a semantic snapshot
+    Snapshot {
+        #[arg(long, help = "Account alias to use")]
+        alias: Option<String>,
+        #[arg(
+            long,
+            default_value = "https://www.reddit.com",
+            help = "URL to browse and snapshot"
+        )]
+        url: String,
+        #[arg(long, help = "Run in visible headed window instead of headless")]
+        headed: bool,
+    },
     /// Open browser to Reddit settings section
     Settings {
         #[arg(long, default_value = "feed")]
@@ -317,7 +363,11 @@ impl AppContext {
             client_secret.clone(),
         ));
 
-        let browser_driver = Arc::new(BrowserDriver::new().with_storage(storage.clone()));
+        let browser_driver = Arc::new(
+            BrowserDriver::new()
+                .with_storage(storage.clone())
+                .with_credential_store(auth_manager.credential_store()),
+        );
         let router = Arc::new(CapabilityRouter::new(api_driver, browser_driver.clone()));
 
         let action_manager = Arc::new(ActionManager::new(
@@ -502,16 +552,102 @@ impl AppContext {
                     timeout_secs,
                 } => {
                     let ctx = self.account_manager.get_account_context(Some(&alias))?;
-                    println!("Launching visible Chrome browser for manual login...");
+                    println!("Launching Obscura stealth browser for account login & takeover...");
                     println!(
-                        "Please sign in on the Reddit window. Waiting up to {} seconds...",
+                        "Please complete sign in on the Reddit window. Waiting up to {} seconds...",
                         timeout_secs
                     );
-                    let user = self
+                    let result = self
                         .browser_driver
-                        .interactive_login(&ctx, Duration::from_secs(timeout_secs))
+                        .takeover_account(&ctx, None, Duration::from_secs(timeout_secs))
                         .await?;
-                    println!("Login complete! Verified username: u/{}", user);
+                    println!("Account takeover verified!");
+                    println!("  Reddit user:      u/{}", result.verified_username);
+                    println!("  Cookies captured: {}", result.cookies_captured);
+                    println!(
+                        "  OS Keychain:      {}",
+                        if result.keychain_saved {
+                            "Secured (Encrypted in OS Keychain)"
+                        } else {
+                            "Profile directory only"
+                        }
+                    );
+                    println!("  Profile path:     {}", result.profile_path);
+                    if let Some(snap) = result.initial_snapshot {
+                        println!(
+                            "  Semantic nodes:   {} interactive elements indexed",
+                            snap.element_count
+                        );
+                    }
+                }
+
+                AccountSubcommand::Cookies { alias } => {
+                    let _ctx = self.account_manager.get_account_context(Some(&alias))?;
+                    match self.browser_driver.load_cookies_from_keychain(&alias)? {
+                        Some(jar) => {
+                            println!("OS Keychain Session Cookies for '{}':", alias);
+                            println!(
+                                "  Reddit User:  {}",
+                                jar.reddit_username.as_deref().unwrap_or("unknown")
+                            );
+                            println!("  Captured At:  {}", jar.captured_at);
+                            println!("  Cookie Count: {}", jar.cookie_count);
+                            println!("  Security:     Encrypted in OS Keychain (service: 'reddit-agent', keyless)");
+                            println!("  Cookies indexed:");
+                            for c in &jar.cookies {
+                                let flags = [
+                                    if c.secure.unwrap_or(false) {
+                                        "secure"
+                                    } else {
+                                        "insecure"
+                                    },
+                                    if c.http_only.unwrap_or(false) {
+                                        "httpOnly"
+                                    } else {
+                                        "jsAccessible"
+                                    },
+                                ]
+                                .join(", ");
+                                println!(
+                                    "    - {:<20} (domain: {}, {})",
+                                    c.name,
+                                    c.domain.as_deref().unwrap_or("none"),
+                                    flags
+                                );
+                            }
+                        }
+                        None => {
+                            println!("No cookies found in OS Keychain for account '{}'.", alias);
+                            println!(
+                                "Run `reddit-agent account login {}` to authenticate and save cookies.",
+                                alias
+                            );
+                        }
+                    }
+                }
+
+                AccountSubcommand::Takeover {
+                    alias,
+                    url,
+                    timeout_secs,
+                } => {
+                    let ctx = self.account_manager.get_account_context(Some(&alias))?;
+                    println!("Initiating Obscura account takeover for alias '{}'...", alias);
+                    let result = self
+                        .browser_driver
+                        .takeover_account(&ctx, url.as_deref(), Duration::from_secs(timeout_secs))
+                        .await?;
+                    println!("Account takeover verified!");
+                    println!("  Reddit user:      u/{}", result.verified_username);
+                    println!("  Cookies captured: {}", result.cookies_captured);
+                    println!(
+                        "  OS Keychain:      {}",
+                        if result.keychain_saved {
+                            "Secured"
+                        } else {
+                            "Profile directory only"
+                        }
+                    );
                 }
 
                 AccountSubcommand::Whoami { alias } => {
@@ -834,22 +970,57 @@ impl AppContext {
             },
 
             Commands::Browser { subcommand } => match subcommand {
-                BrowserSubcommand::Open => {
-                    let ctx = self.account_manager.get_account_context(account_override)?;
-                    println!("Launching isolated browser for '{}'...", ctx.account.alias);
+                BrowserSubcommand::Open { alias, url } => {
+                    let target_alias = alias.as_deref().or(account_override);
+                    let ctx = self.account_manager.get_account_context(target_alias)?;
+                    let nav_url = url.as_deref().unwrap_or("https://www.reddit.com");
+                    println!(
+                        "Launching Obscura stealth browser for '{}'...",
+                        ctx.account.alias
+                    );
                     let browser = self
                         .browser_driver
                         .launch_isolated_browser(&ctx.account.alias, false)
                         .await?;
-                    let _page = browser.new_page("https://www.reddit.com").await?;
-                    println!("Browser opened. Press Ctrl+C to close.");
+                    let page = browser.new_page(nav_url).await?;
+                    self.browser_driver.apply_stealth_engine(&page).await?;
+                    let count = self
+                        .browser_driver
+                        .inject_keychain_cookies(&page, &ctx.account.alias)
+                        .await
+                        .unwrap_or(0);
+                    if count > 0 {
+                        println!("Restored {} cookies from OS Keychain.", count);
+                    }
+                    println!("Browser opened to {}. Press Ctrl+C to close.", nav_url);
                     tokio::signal::ctrl_c().await?;
+                }
+
+                BrowserSubcommand::Snapshot { alias, url, headed } => {
+                    let target_alias = alias.as_deref().or(account_override);
+                    let ctx = self.account_manager.get_account_context(target_alias)?;
+                    println!(
+                        "Browsing {} with natural human behavior simulation...",
+                        url
+                    );
+                    let snapshot = self
+                        .browser_driver
+                        .human_browse(&ctx, &url, !headed)
+                        .await?;
+                    println!("\n=== Semantic Accessibility Tree (agent-browser) ===");
+                    println!("{}", snapshot.tree_text);
+                    println!(
+                        "\nIndexed {} interactive elements with [@e1, @e2...] references.",
+                        snapshot.element_count
+                    );
                 }
 
                 BrowserSubcommand::Settings { section } => {
                     let ctx = self.account_manager.get_account_context(account_override)?;
                     let url = self.browser_driver.open_settings(&ctx, &section).await?;
-                    println!("Navigated to {}", url);
+                    println!("Settings page opened: {}", url);
+                    println!("Browser active. Press Ctrl+C to close.");
+                    tokio::signal::ctrl_c().await?;
                 }
             },
 
@@ -1166,6 +1337,74 @@ impl AppContext {
                 }
             },
 
+            Commands::Route { prompt, format } => {
+                let dag = crate::agents::router::DynamicRouter::build_execution_dag(&prompt, None);
+                if format.to_lowercase() == "json" {
+                    println!("{}", serde_json::to_string_pretty(&dag)?);
+                } else {
+                    println!("🧭 === OmniSkill Dynamic Agent Router ===");
+                    println!("Prompt:      '{}'", dag.user_prompt);
+                    println!("Language:    {}", dag.detected_language);
+                    println!("Intent:      {:?} (Confidence: {:.2})", dag.intent_category, dag.confidence_score);
+                    println!("\nExecution Waves ({} waves, {} total steps):", dag.execution_waves.len(), dag.steps.len());
+                    for wave in &dag.execution_waves {
+                        println!("  [Wave {}]", wave.wave_index + 1);
+                        for sid in &wave.step_ids {
+                            if let Some(step) = dag.steps.iter().find(|s| &s.step_id == sid) {
+                                let approval_str = if step.requires_human_approval { " ⚠️ [APPROVAL REQUIRED]" } else { "" };
+                                println!("    • {} -> Tool: `{}`{}", step.agent_role, step.tool_name, approval_str);
+                                println!("      {}", step.description);
+                            }
+                        }
+                    }
+                    if !dag.safety_notes.is_empty() {
+                        println!("\nSafety Invariants:");
+                        for note in &dag.safety_notes {
+                            println!("  ✓ {}", note);
+                        }
+                    }
+                }
+            }
+
+            Commands::Orchestrate {
+                prompt,
+                product,
+                subreddits,
+            } => {
+                println!("🎭 Launching Master Orchestrator for: '{}'...", prompt);
+                let product_ctx = product.map(|name| {
+                    let subs = subreddits
+                        .map(|s| s.split(',').map(|i| i.trim().trim_start_matches("r/").to_string()).collect())
+                        .unwrap_or_else(|| vec!["SaaS".to_string(), "startups".to_string()]);
+                    ProductContext {
+                        product_name: name.clone(),
+                        value_prop: "High performance agentic solution".to_string(),
+                        icp_target: "Founders & developers".to_string(),
+                        pain_points: vec!["manual effort".to_string(), "time waste".to_string()],
+                        competitors: vec![],
+                        target_subreddits: subs,
+                        high_intent_phrases: vec!["recommendation".to_string(), "alternative".to_string()],
+                        affiliation_disclosure: format!("Full disclosure: I work on {}", name),
+                    }
+                });
+
+                let orchestrator = crate::agents::orchestrator::MasterOrchestrator::new();
+                let report = orchestrator.orchestrate_from_prompt(&prompt, product_ctx).await
+                    .map_err(|e| anyhow::anyhow!(e))?;
+
+                println!("\n✅ Workflow Completed: [{}] (Status: {})", report.workflow_id, report.status);
+                println!("- Completed Steps: {}/{}", report.steps_completed, report.total_steps);
+                println!("- Context Summary: {}", report.context_summary);
+
+                println!("\nExecution Log:");
+                for line in &report.execution_log {
+                    println!("  {}", line);
+                }
+
+                println!("\nFinal Deliverable Summary:");
+                println!("{}", serde_json::to_string_pretty(&report.result)?);
+            }
+
             Commands::Reddit2Skill {
                 topic,
                 subreddits,
@@ -1205,7 +1444,8 @@ impl AppContext {
                     self.router,
                     self.action_manager,
                     self.issue_engine,
-                );
+                )
+                .with_browser_driver(self.browser_driver);
                 server.run_stdio_server().await?;
             }
         }

@@ -107,13 +107,13 @@ impl CredentialStore for SystemKeyring {
 /// In-memory credential store for fast isolated unit testing
 #[derive(Default, Clone)]
 pub struct MemoryKeyring {
-    store: Arc<RwLock<HashMap<String, String>>>,
+    store: Arc<std::sync::RwLock<HashMap<String, String>>>,
 }
 
 impl MemoryKeyring {
     pub fn new() -> Self {
         Self {
-            store: Arc::new(RwLock::new(HashMap::new())),
+            store: Arc::new(std::sync::RwLock::new(HashMap::new())),
         }
     }
 }
@@ -121,7 +121,10 @@ impl MemoryKeyring {
 impl CredentialStore for MemoryKeyring {
     fn get_secret(&self, service: &str, account: &str) -> Result<SecretToken, AuthError> {
         let key = format!("{}:{}", service, account);
-        let store = self.store.blocking_read();
+        let store = self
+            .store
+            .read()
+            .map_err(|e| AuthError::Keyring(e.to_string()))?;
         match store.get(&key) {
             Some(v) => Ok(SecretToken::new(v.clone())),
             None => Err(AuthError::Keyring(format!(
@@ -133,14 +136,20 @@ impl CredentialStore for MemoryKeyring {
 
     fn set_secret(&self, service: &str, account: &str, secret: &str) -> Result<(), AuthError> {
         let key = format!("{}:{}", service, account);
-        let mut store = self.store.blocking_write();
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| AuthError::Keyring(e.to_string()))?;
         store.insert(key, secret.to_string());
         Ok(())
     }
 
     fn delete_secret(&self, service: &str, account: &str) -> Result<(), AuthError> {
         let key = format!("{}:{}", service, account);
-        let mut store = self.store.blocking_write();
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| AuthError::Keyring(e.to_string()))?;
         store.remove(&key);
         Ok(())
     }
@@ -182,12 +191,20 @@ impl AuthManager {
         Self::new(Arc::new(SystemKeyring), client)
     }
 
+    pub fn credential_store(&self) -> Arc<dyn CredentialStore> {
+        self.credential_store.clone()
+    }
+
     pub fn keyring_service() -> &'static str {
         "reddit-agent"
     }
 
     pub fn keyring_account(alias: &str) -> String {
         format!("oauth_refresh:{}", alias)
+    }
+
+    pub fn keyring_cookies_account(alias: &str) -> String {
+        format!("browser_cookies:{}", alias)
     }
 
     pub fn store_refresh_token(&self, alias: &str, refresh_token: &str) -> Result<(), AuthError> {
@@ -202,6 +219,25 @@ impl AuthManager {
         self.credential_store
             .get_secret(Self::keyring_service(), &Self::keyring_account(alias))
             .map_err(|_| AuthError::NoRefreshToken(alias.to_string()))
+    }
+
+    pub fn store_cookies(&self, alias: &str, cookies_json: &str) -> Result<(), AuthError> {
+        self.credential_store.set_secret(
+            Self::keyring_service(),
+            &Self::keyring_cookies_account(alias),
+            cookies_json,
+        )
+    }
+
+    pub fn get_cookies(&self, alias: &str) -> Result<SecretToken, AuthError> {
+        self.credential_store
+            .get_secret(Self::keyring_service(), &Self::keyring_cookies_account(alias))
+            .map_err(|e| AuthError::Keyring(format!("No cookies found for account '{}': {}", alias, e)))
+    }
+
+    pub fn delete_cookies(&self, alias: &str) -> Result<(), AuthError> {
+        self.credential_store
+            .delete_secret(Self::keyring_service(), &Self::keyring_cookies_account(alias))
     }
 
     pub fn generate_authorize_url(

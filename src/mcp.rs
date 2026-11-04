@@ -36,6 +36,7 @@ pub struct McpServer {
     router: Arc<CapabilityRouter>,
     action_manager: Arc<ActionManager>,
     issue_engine: Arc<IssueEngine>,
+    browser_driver: Option<Arc<crate::drivers::browser::BrowserDriver>>,
 }
 
 impl McpServer {
@@ -50,7 +51,16 @@ impl McpServer {
             router,
             action_manager,
             issue_engine,
+            browser_driver: None,
         }
+    }
+
+    pub fn with_browser_driver(
+        mut self,
+        browser_driver: Arc<crate::drivers::browser::BrowserDriver>,
+    ) -> Self {
+        self.browser_driver = Some(browser_driver);
+        self
     }
 
     pub fn list_tools() -> Value {
@@ -397,11 +407,206 @@ impl McpServer {
                         "output_dir": { "type": "string", "description": "Optional base directory to write the generated skill." }
                     }
                 }
+            },
+            {
+                "name": "reddit_agent_route",
+                "description": "Dynamic OmniSkill Agent Router: analyzes any user intent/prompt (in Arabic or English), classifies intent category, and compiles an optimal multi-step Directed Acyclic Graph (DAG) with dependency waves and safety notes.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["prompt"],
+                    "properties": {
+                        "prompt": { "type": "string", "description": "Natural language request, instruction, or goal in any language." },
+                        "context": { "type": "object", "description": "Optional context object with product_name, subreddits, etc." }
+                    }
+                }
+            },
+            {
+                "name": "reddit_agent_orchestrate",
+                "description": "Master OmniSkill Orchestrator: autonomously executes a natural language goal wave-by-wave by dispatching specialized Tool-Agents (DiggerAgent, MinerAgent, DrafterAgent) with fail-closed safety checkpoints.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["prompt"],
+                    "properties": {
+                        "prompt": { "type": "string", "description": "Natural language goal to orchestrate." },
+                        "product": { "type": "object", "description": "Optional ProductContext object." }
+                    }
+                }
+            },
+            {
+                "name": "reddit_account_login",
+                "description": "Interactive Reddit account login & takeover using Obscura stealth browser. Opens visible anti-detection window, restores existing Keychain session if present, waits for authentication, and securely stores session cookies encrypted in OS Keychain.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["account"],
+                    "properties": {
+                        "account": { "type": "string", "description": "Account alias to log in." },
+                        "timeout_secs": { "type": "integer", "description": "Timeout in seconds to wait for login (default: 180)." }
+                    }
+                }
+            },
+            {
+                "name": "reddit_takeover_account",
+                "description": "Initiate Obscura stealth account takeover with optional custom start URL, monitor session tokens, and persist encrypted cookies to OS Keychain.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["account"],
+                    "properties": {
+                        "account": { "type": "string", "description": "Account alias to take over." },
+                        "url": { "type": "string", "description": "Optional starting target URL (default: https://www.reddit.com/login)." },
+                        "timeout_secs": { "type": "integer", "description": "Timeout in seconds (default: 180)." }
+                    }
+                }
+            },
+            {
+                "name": "reddit_account_cookies",
+                "description": "Inspect metadata for account session cookies stored in OS Keychain (cookie count, verified username, timestamp) with zero raw token exposure.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["account"],
+                    "properties": {
+                        "account": { "type": "string", "description": "Account alias." }
+                    }
+                }
+            },
+            {
+                "name": "reddit_human_browse",
+                "description": "Stealth browser navigation with human behavior emulation (anti-detection flags, Keychain cookie restoration, humanized reading hesitation, smooth momentum scrolling) returning a compact semantic element snapshot (@e1, @e2 references) for AI agent interaction.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["url"],
+                    "properties": {
+                        "account": { "type": "string", "description": "Optional account alias. Restores Keychain cookies if provided." },
+                        "url": { "type": "string", "description": "Target Reddit URL to browse (e.g. 'https://www.reddit.com/r/rust')." },
+                        "headless": { "type": "boolean", "description": "Run in headless mode (default: true)." }
+                    }
+                }
             }
         ])
     }
 
     pub async fn handle_tool_call(&self, name: &str, args: Value) -> Result<Value, String> {
+        if name == "reddit_agent_route" {
+            let prompt = args["prompt"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'prompt' argument".to_string())?;
+
+            let context_opt = args.get("context").cloned();
+            let dag = crate::agents::router::DynamicRouter::build_execution_dag(prompt, context_opt);
+            return Ok(json!(dag));
+        }
+
+        if name == "reddit_agent_orchestrate" {
+            let prompt = args["prompt"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'prompt' argument".to_string())?;
+
+            let product: Option<crate::agents::opportunity::ProductContext> = args
+                .get("product")
+                .and_then(|p| serde_json::from_value(p.clone()).ok());
+
+            let orchestrator = crate::agents::orchestrator::MasterOrchestrator::new();
+            let report = orchestrator.orchestrate_from_prompt(prompt, product).await?;
+            return Ok(json!(report));
+        }
+
+        if name == "reddit_account_login" || name == "reddit_takeover_account" {
+            let account = args["account"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'account' argument".to_string())?;
+
+            let timeout_secs = args["timeout_secs"].as_u64().unwrap_or(180);
+            let url = args["url"].as_str();
+
+            let ctx = self
+                .account_manager
+                .get_account_context(Some(account))
+                .map_err(|e| format!("Account error: {}", e))?;
+
+            let browser_driver = self.browser_driver.clone().unwrap_or_else(|| {
+                Arc::new(
+                    crate::drivers::browser::BrowserDriver::new()
+                        .with_credential_store(self.account_manager.auth().credential_store()),
+                )
+            });
+
+            let res = browser_driver
+                .takeover_account(&ctx, url, std::time::Duration::from_secs(timeout_secs))
+                .await
+                .map_err(|e| format!("Takeover failed: {}", e))?;
+
+            return Ok(json!(res));
+        }
+
+        if name == "reddit_account_cookies" {
+            let account = args["account"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'account' argument".to_string())?;
+
+            let _ctx = self
+                .account_manager
+                .get_account_context(Some(account))
+                .map_err(|e| format!("Account error: {}", e))?;
+
+            let browser_driver = self.browser_driver.clone().unwrap_or_else(|| {
+                Arc::new(
+                    crate::drivers::browser::BrowserDriver::new()
+                        .with_credential_store(self.account_manager.auth().credential_store()),
+                )
+            });
+
+            let maybe_jar = browser_driver
+                .load_cookies_from_keychain(account)
+                .map_err(|e| format!("Failed to read Keychain: {}", e))?;
+
+            return match maybe_jar {
+                Some(jar) => Ok(json!({
+                    "account": account,
+                    "has_cookies": true,
+                    "verified_username": jar.reddit_username,
+                    "captured_at": jar.captured_at,
+                    "cookie_count": jar.cookie_count,
+                    "keychain_storage": "Encrypted in OS Keychain ('reddit-agent')",
+                    "cookie_names": jar.cookies.iter().map(|c| c.name.clone()).collect::<Vec<_>>()
+                })),
+                None => Ok(json!({
+                    "account": account,
+                    "has_cookies": false,
+                    "message": format!(
+                        "No cookies found in OS Keychain for account '{}'. Run reddit_account_login.",
+                        account
+                    )
+                })),
+            };
+        }
+
+        if name == "reddit_human_browse" {
+            let url = args["url"]
+                .as_str()
+                .ok_or_else(|| "Missing required 'url' argument".to_string())?;
+
+            let account = args["account"].as_str();
+            let headless = args["headless"].as_bool().unwrap_or(true);
+
+            let ctx = self
+                .account_manager
+                .get_account_context(account)
+                .map_err(|e| format!("Account error: {}", e))?;
+
+            let browser_driver = self.browser_driver.clone().unwrap_or_else(|| {
+                Arc::new(
+                    crate::drivers::browser::BrowserDriver::new()
+                        .with_credential_store(self.account_manager.auth().credential_store()),
+                )
+            });
+
+            let snapshot = browser_driver
+                .human_browse(&ctx, url, headless)
+                .await
+                .map_err(|e| format!("Human browse failed: {}", e))?;
+
+            return Ok(json!(snapshot));
+        }
+
         if name == "reddit_2_skill" {
             let topic = args["topic"]
                 .as_str()
@@ -1197,5 +1402,52 @@ mod tests {
 
         assert_eq!(ratio_res["account"], "personal");
         assert!(ratio_res["audit"]["is_compliant"].is_boolean());
+
+        // Verify newly added stealth browser & keychain takeover tools are present
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_account_login"));
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_takeover_account"));
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_account_cookies"));
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_human_browse"));
+
+        // Call reddit_account_cookies when empty
+        let cookie_res_empty = server
+            .handle_tool_call("reddit_account_cookies", json!({ "account": "personal" }))
+            .await
+            .unwrap();
+        assert_eq!(cookie_res_empty["has_cookies"], false);
+
+        // Populate keychain cookies and test again
+        let store = server.account_manager.auth().credential_store();
+        let browser_driver = Arc::new(
+            crate::drivers::browser::BrowserDriver::new().with_credential_store(store),
+        );
+        let sample_jar = crate::drivers::browser::SessionCookieJar {
+            alias: "personal".to_string(),
+            reddit_username: Some("my_user".to_string()),
+            captured_at: "2026-11-04T12:00:00Z".to_string(),
+            cookie_count: 1,
+            cookies: vec![crate::drivers::browser::SessionCookie {
+                name: "reddit_session".to_string(),
+                value: "session_tok".to_string(),
+                domain: Some(".reddit.com".to_string()),
+                path: Some("/".to_string()),
+                secure: Some(true),
+                http_only: Some(true),
+                same_site: Some("Lax".to_string()),
+                expires: None,
+            }],
+        };
+        browser_driver
+            .save_cookies_to_keychain("personal", &sample_jar)
+            .unwrap();
+
+        let server_with_browser = server.with_browser_driver(browser_driver);
+        let cookie_res_saved = server_with_browser
+            .handle_tool_call("reddit_account_cookies", json!({ "account": "personal" }))
+            .await
+            .unwrap();
+        assert_eq!(cookie_res_saved["has_cookies"], true);
+        assert_eq!(cookie_res_saved["cookie_count"], 1);
+        assert_eq!(cookie_res_saved["verified_username"], "my_user");
     }
 }

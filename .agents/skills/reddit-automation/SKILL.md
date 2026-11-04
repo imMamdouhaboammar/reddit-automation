@@ -36,7 +36,7 @@ metadata:
 
 Automate high-intent community discovery, experience-grammar drafting, disclosure-compliant publishing, and knowledge synthesis on Reddit with zero spam, zero astroturfing, and cryptographic fail-closed safety.
 
-Powered by [`reddit-agent`](https://github.com/imMamdouhaboammar/reddit-agent) native Rust core with 28 Model Context Protocol (MCP) tools.
+Powered by [`reddit-agent`](https://github.com/imMamdouhaboammar/reddit-agent) native Rust core with 32 Model Context Protocol (MCP) tools.
 
 ---
 
@@ -45,21 +45,27 @@ Powered by [`reddit-agent`](https://github.com/imMamdouhaboammar/reddit-agent) n
 This skill follows the **OmniSkill Tripartite Architecture**:
 - **Router (`SKILL.md`)**: High-level execution lifecycle, safety invariants, and capability dispatch (this file).
 - **Playbooks (`playbooks/`)**: Step-by-step procedures for autonomous workflows.
-- **Tool References (`references/tools/`)**: In-depth contracts, schemas, and examples for all 28 MCP tools.
+- **Tool References (`references/tools/`)**: In-depth contracts, schemas, and examples for all 32 MCP tools.
 - **Scripts (`scripts/`)**: Deterministic validation and audit CLI utilities.
 
 ```
 skills/reddit-automation/
 ├── SKILL.md                                 # High-density execution router (< 500 lines)
 ├── playbooks/                               # End-to-end operational workflows
+│   ├── playbook-orchestration.md            # Dynamic intent routing & multi-agent orchestration
 │   ├── playbook-opportunity-hunting.md      # Multi-tier thread discovery & intent scoring (Digger & Miner)
 │   ├── playbook-experience-drafting.md      # 25-55 word Experience Grammar drafting
 │   ├── playbook-verified-publishing.md      # Two-stage cryptographic ActionPlan execution
 │   ├── playbook-community-building.md       # Karma health, 90/10 ratio & AutoMod defenses
 │   ├── playbook-incident-diagnosis.md       # Root-cause error triage & automated repair
 │   └── playbook-reddit-2-skill.md           # Consensus mining to synthesize OmniSkills
-├── references/tools/                        # Complete technical docs for all 28 tools
+├── references/tools/                        # Complete technical docs for all 32 tools
 │   ├── README.md                            # Comprehensive tool index & taxonomy
+│   ├── reddit_account_login.md              # Obscura stealth interactive login & takeover
+│   ├── reddit_account_cookies.md            # OS Keychain session cookie metadata inspector
+│   ├── reddit_human_browse.md               # Humanized browsing with hesitation & @e1/@e2 snapshots
+│   ├── reddit_agent_route.md                # Natural language intent classifier & DAG compiler
+│   ├── reddit_agent_orchestrate.md          # Multi-agent wave-by-wave execution coordinator
 │   ├── reddit_digger.md                     # Deep candidate source discovery & mapping
 │   ├── reddit_miner.md                      # Deep content extraction & intent classification
 │   ├── reddit_discover_opportunities.md     # Composite pipeline (digger + miner)
@@ -140,6 +146,7 @@ Run [reddit_publish_prepared_comment](file:///Users/mamdouhaboammar/Documents/M-
 
 | Playbook | Objective | Primary Tools |
 |----------|-----------|---------------|
+| [playbook-orchestration.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-orchestration.md) | Dynamic intent routing & multi-agent coordination | `reddit_agent_route`, `reddit_agent_orchestrate` |
 | [playbook-opportunity-hunting.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-opportunity-hunting.md) | Deep source aggregation & intent mining | `reddit_digger`, `reddit_miner`, `reddit_search` |
 | [playbook-experience-drafting.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-experience-drafting.md) | Anti-slop 25-55w response generation | `reddit_draft_response`, `verify_experience_grammar.py` |
 | [playbook-verified-publishing.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-verified-publishing.md) | Tamper-proof 2-stage execution | `reddit_prepare_comment`, `reddit_approve_action`, `reddit_publish_prepared_comment` |
@@ -165,6 +172,12 @@ Run [reddit_publish_prepared_comment](file:///Users/mamdouhaboammar/Documents/M-
 # Start MCP server for Antigravity, Claude, or Cursor
 cargo run --bin reddit-agent -- mcp
 
+# Dynamic Intent Router (OmniSkill DAG compiler)
+cargo run --bin reddit-agent -- route "ابحث لي عن فرص تسويقية في r/SaaS" --format text
+
+# Master Multi-Agent Orchestrator (Wave-by-wave execution)
+cargo run --bin reddit-agent -- orchestrate "Find SaaS opportunities" --product "FlowKit" --subreddits "SaaS"
+
 # Deep candidate source discovery (reddit-digger)
 cargo run --bin reddit-agent -- opportunity dig --subreddit SaaS --query "recommendation" --limit 15
 
@@ -180,4 +193,11 @@ cargo run --bin reddit-agent -- 2-skill \
 cargo run --bin reddit-agent -- action list
 cargo run --bin reddit-agent -- action approve <ACTION_ID>
 cargo run --bin reddit-agent -- action execute <ACTION_ID>
+
+# Obscura stealth account takeover & encrypted Keychain session persistence
+cargo run --bin reddit-agent -- account login <alias>
+cargo run --bin reddit-agent -- account cookies <alias>
+
+# Browse Reddit with human behavior emulation & agent-browser semantic snapshot
+cargo run --bin reddit-agent -- browser snapshot --url "https://www.reddit.com/r/rust"
 ```

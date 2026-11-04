@@ -1,6 +1,6 @@
 # Reddit Automation Tools Catalog
 
-Complete technical reference for all 26 agentic MCP tools provided by the `reddit-automation` engine.
+Complete technical reference for all 28 agentic MCP tools provided by the `reddit-automation` engine.
 
 ---
 
@@ -79,3 +79,25 @@ Deterministic troubleshooting engine for failure isolation and automated remedia
 | `reddit_diagnose_issue` | Root-cause analysis on API or submission failures | [reddit_diagnose_issue.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_diagnose_issue.md) |
 | `reddit_plan_repair` | Generate step-by-step repair plan with automated/human classification | [reddit_plan_repair.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_plan_repair.md) |
 | `reddit_apply_safe_repair` | Safely execute non-destructive repair actions (backoff, token refresh) | [reddit_apply_safe_repair.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_apply_safe_repair.md) |
+
+---
+
+### 7. Dynamic Routing & Multi-Agent Orchestration (OmniSkill v6.2.0)
+Autonomous intent classification, execution DAG generation, and wave-by-wave Tool-Agent coordination.
+
+| Tool | Description | Documentation |
+|------|-------------|---------------|
+| `reddit_agent_route` | Classifies natural language (AR/EN) and compiles execution DAG | [reddit_agent_route.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_agent_route.md) |
+| `reddit_agent_orchestrate` | Executes goal wave-by-wave across specialized Tool-Agents | [reddit_agent_orchestrate.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_agent_orchestrate.md) |
+
+---
+
+### 8. Stealth Browser Engine & Account Takeover (Obscura & agent-browser)
+Anti-detection stealth browsing, encrypted OS Keychain session persistence, human hesitation, momentum scrolling, and compact semantic snapshots.
+
+| Tool | Description | Documentation |
+|------|-------------|---------------|
+| `reddit_account_login` | Interactive stealth login & takeover; saves cookies to OS Keychain | [reddit_account_login.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_account_login.md) |
+| `reddit_takeover_account` | Alias for account takeover with custom starting URL | [reddit_account_login.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_account_login.md) |
+| `reddit_account_cookies` | Inspect OS Keychain session metadata (zero raw token leakage) | [reddit_account_cookies.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_account_cookies.md) |
+| `reddit_human_browse` | Stealth browsing with human behavior simulation & semantic snapshots | [reddit_human_browse.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_human_browse.md) |
