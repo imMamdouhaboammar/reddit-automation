@@ -850,7 +850,7 @@ impl AppContext {
                     );
 
                     println!("\nFound {} ranked opportunities:\n", ranked.len());
-                    for (i, opp) in ranked.iter().take(5).enumerate() {
+                    for (i, opp) in ranked.iter().take(10).enumerate() {
                         println!(
                             "{}. [Score: {:.2}] {} (r/{})",
                             i + 1,
@@ -858,7 +858,8 @@ impl AppContext {
                             opp.thread.title,
                             opp.thread.subreddit
                         );
-                        println!("   Why: {}", opp.opportunity_reason);
+                        println!("   URL:     {}", opp.thread.canonical_url());
+                        println!("   Why:     {}", opp.opportunity_reason);
                         println!(
                             "   Signals: {:?} | Comments: {}",
                             opp.detected_signals, opp.thread.num_comments
@@ -883,6 +884,7 @@ impl AppContext {
                         num_comments: 5,
                         is_locked: false,
                         is_archived: false,
+                        url: "https://reddit.com/r/community/comments/cli_draft_target/".to_string(),
                     };
 
                     let sample_product = ProductContext {

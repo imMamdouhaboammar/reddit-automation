@@ -281,6 +281,14 @@ impl RedditKeylessDriver {
                 let num_comments = data["num_comments"].as_u64().unwrap_or(0) as u32;
                 let is_locked = data["locked"].as_bool().unwrap_or(false);
                 let is_archived = data["archived"].as_bool().unwrap_or(false);
+                let permalink = data["permalink"].as_str().unwrap_or("");
+                let url = if permalink.is_empty() {
+                    format!("https://reddit.com/r/{}/comments/{}/", subreddit, id)
+                } else if permalink.starts_with("http") {
+                    permalink.to_string()
+                } else {
+                    format!("https://reddit.com{}", permalink)
+                };
 
                 threads.push(RedditThread {
                     id,
@@ -292,6 +300,7 @@ impl RedditKeylessDriver {
                     num_comments,
                     is_locked,
                     is_archived,
+                    url,
                 });
             }
         }
@@ -321,6 +330,15 @@ impl RedditKeylessDriver {
             let created_utc = item["created_utc"].as_i64().unwrap_or(0);
             let num_comments = item["num_comments"].as_u64().unwrap_or(0) as u32;
 
+            let permalink = item["permalink"].as_str().unwrap_or("");
+            let url = if permalink.is_empty() {
+                format!("https://reddit.com/r/{}/comments/{}/", subreddit, id)
+            } else if permalink.starts_with("http") {
+                permalink.to_string()
+            } else {
+                format!("https://reddit.com{}", permalink)
+            };
+
             threads.push(RedditThread {
                 id,
                 subreddit,
@@ -331,6 +349,7 @@ impl RedditKeylessDriver {
                 num_comments,
                 is_locked: false,
                 is_archived: false,
+                url,
             });
         }
         threads

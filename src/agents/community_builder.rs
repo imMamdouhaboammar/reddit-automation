@@ -407,6 +407,7 @@ mod tests {
                 num_comments: 5,
                 is_locked: false,
                 is_archived: false,
+                url: "https://reddit.com/r/indiehackers/comments/1/".to_string(),
             },
             RedditThread {
                 id: "2".to_string(),
@@ -418,6 +419,7 @@ mod tests {
                 num_comments: 10,
                 is_locked: false,
                 is_archived: false,
+                url: "https://reddit.com/r/indiehackers/comments/2/".to_string(),
             },
         ];
 

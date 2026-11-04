@@ -54,6 +54,18 @@ pub struct RedditThread {
     pub num_comments: u32,
     pub is_locked: bool,
     pub is_archived: bool,
+    #[serde(default)]
+    pub url: String,
+}
+
+impl RedditThread {
+    pub fn canonical_url(&self) -> String {
+        if !self.url.is_empty() {
+            self.url.clone()
+        } else {
+            format!("https://reddit.com/r/{}/comments/{}/", self.subreddit, self.id)
+        }
+    }
 }
 
 /// The specific high-intent signal detected in a thread.
@@ -411,6 +423,7 @@ mod tests {
                 num_comments: 4,
                 is_locked: false,
                 is_archived: false,
+                url: "https://reddit.com/r/SaaS/comments/t1/".to_string(),
             },
             RedditThread {
                 id: "t2".to_string(),
@@ -422,6 +435,7 @@ mod tests {
                 num_comments: 50,
                 is_locked: false,
                 is_archived: false,
+                url: "https://reddit.com/r/gaming/comments/t2/".to_string(),
             },
             RedditThread {
                 id: "t3".to_string(),
@@ -433,6 +447,7 @@ mod tests {
                 num_comments: 2,
                 is_locked: true,
                 is_archived: false,
+                url: "https://reddit.com/r/SaaS/comments/t3/".to_string(),
             },
         ];
 
@@ -467,6 +482,7 @@ mod tests {
             num_comments: 2,
             is_locked: false,
             is_archived: false,
+            url: "https://reddit.com/r/SaaS/comments/t1/".to_string(),
         };
 
         let opportunity = RankedOpportunity {
