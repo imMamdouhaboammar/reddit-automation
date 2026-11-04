@@ -7,7 +7,7 @@ description: >
   multi-tier keyless thread discovery (Shreddit + Arctic Shift fallback), semantic
   relevance filtering, prompt-injection sanitization, experience grammar drafting
   (25-55 words with mandatory affiliation disclosure), 90/10 community ratio auditing,
-  and cryptographic two-stage approval gates (SHA-256) for secure, ban-proof engagement.
+  cryptographic two-stage approval gates (SHA-256), and automated skill synthesis (reddit-2-skill).
 emoji: "👽"
 homepage: https://github.com/imMamdouhaboammar/reddit-agent
 license: MIT
@@ -19,6 +19,7 @@ metadata:
         - reddit-agent
         - cargo
         - bun
+        - python3
     primaryEnv: REDDIT_CLIENT_ID
     tags:
       - reddit
@@ -28,180 +29,154 @@ metadata:
       - mcp
       - agentic
       - growth
+      - omni-skill
 ---
 
-# 👽 Reddit Automation (Fully Autonomous Agentic Operator)
+# 👽 Reddit Automation (OmniSkill v6.2.0 Autonomous Operator)
 
-*Engineered as the autonomous evolution of `flowkit-labs/skills` powered by [`reddit-agent`](https://github.com/imMamdouhaboammar/reddit-agent).*
+Automate high-intent community discovery, experience-grammar drafting, disclosure-compliant publishing, and knowledge synthesis on Reddit with zero spam, zero astroturfing, and cryptographic fail-closed safety.
 
-**Automate high-intent community discovery, experience-grammar drafting, and disclosure-compliant engagement on Reddit with zero spam, zero astroturfing, and cryptographic fail-closed safety.**
-
-Unlike manual prompt scripts that require tedious copy-pasting, this skill provides a full end-to-end autonomous agent loop backed by a native Rust engine, local OS Keychain credential encryption, headless Chrome DevTools Protocol (CDP), and standard Model Context Protocol (MCP) server tools.
+Powered by [`reddit-agent`](https://github.com/imMamdouhaboammar/reddit-agent) native Rust core with 26 Model Context Protocol (MCP) tools.
 
 ---
 
-## Autonomous Capabilities & Architecture
+## Architecture & Progressive Disclosure
+
+This skill follows the **OmniSkill Tripartite Architecture**:
+- **Router (`SKILL.md`)**: High-level execution lifecycle, safety invariants, and capability dispatch (this file).
+- **Playbooks (`playbooks/`)**: Step-by-step procedures for autonomous workflows.
+- **Tool References (`references/tools/`)**: In-depth contracts, schemas, and examples for all 26 MCP tools.
+- **Scripts (`scripts/`)**: Deterministic validation and audit CLI utilities.
 
 ```
-   ┌───────────────────────────────────────────────────────────────┐
-   │                  Autonomous AI Agent Client                   │
-   │           (Claude Desktop, Cursor, Antigravity, CLI)          │
-   └───────────────────────────────┬───────────────────────────────┘
-                                   │ JSON-RPC (MCP Tools)
-                                   ▼
-   ┌───────────────────────────────────────────────────────────────┐
-   │             reddit-agent Native Operator (Rust Core)          │
-   │                                                               │
-   │  ┌───────────────────────┐         ┌───────────────────────┐  │
-   │  │  Opportunity Worker   │         │  Community Builder    │  │
-   │  │  - Intent Scoring     │         │  - 90/10 Ratio Audit  │  │
-   │  │  - Prompt Sanitizer   │         │  - Karma Health Check │  │
-   │  │  - Experience Grammar │         │  - Crisis Mitigation  │  │
-   │  └───────────┬───────────┘         └───────────┬───────────┘  │
-   │              │                                 │              │
-   │  ┌───────────▼─────────────────────────────────▼───────────┐  │
-   │  │              Multi-Tier Scraping & Discovery            │  │
-   │  │  1. Public JSON Listings (r/{sub}/hot.json)             │  │
-   │  │  2. Shreddit Web Component Partials                     │  │
-   │  │  3. Arctic Shift Archive Fallback (Keyless & Resilient) │  │
-   │  │  4. OAuth2 Authenticated API Driver                     │  │
-   │  └───────────────────────────┬─────────────────────────────┘  │
-   │                              │                                │
-   │  ┌───────────────────────────▼─────────────────────────────┐  │
-   │  │     Fail-Closed Cryptographic Gate (ActionPlan)         │  │
-   │  │     - Two-stage Dry-Run: Hash = SHA-256(payload)        │  │
-   │  │     - Explicit Human Approval Before Network Mutation   │  │
-   │  └─────────────────────────────────────────────────────────┘  │
-   └───────────────────────────────────────────────────────────────┘
+skills/reddit-automation/
+├── SKILL.md                                 # High-density execution router (< 500 lines)
+├── playbooks/                               # End-to-end operational workflows
+│   ├── playbook-opportunity-hunting.md      # Multi-tier thread discovery & intent scoring
+│   ├── playbook-experience-drafting.md      # 25-55 word Experience Grammar drafting
+│   ├── playbook-verified-publishing.md      # Two-stage cryptographic ActionPlan execution
+│   ├── playbook-community-building.md       # Karma health, 90/10 ratio & AutoMod defenses
+│   ├── playbook-incident-diagnosis.md       # Root-cause error triage & automated repair
+│   └── playbook-reddit-2-skill.md           # Consensus mining to synthesize OmniSkills
+├── references/tools/                        # Complete technical docs for all 26 tools
+│   ├── README.md                            # Comprehensive tool index & taxonomy
+│   ├── reddit_discover_opportunities.md     # Scrape & score high-intent threads
+│   ├── reddit_draft_response.md             # Draft Experience Grammar reply
+│   ├── reddit_audit_community_ratio.md      # Audit 90/10 content-to-promo balance
+│   ├── reddit_2_skill.md                    # Mine Reddit and generate Agent Skills
+│   ├── reddit_prepare_post.md               # Generate post ActionPlan with SHA-256
+│   ├── reddit_approve_action.md             # Approve pending ActionPlan
+│   ├── reddit_publish_prepared_post.md      # Publish approved post
+│   ├── reddit_prepare_comment.md            # Generate comment ActionPlan with hash
+│   ├── reddit_publish_prepared_comment.md   # Publish approved comment
+│   ├── reddit_accounts.md                   # List configured accounts & default
+│   ├── reddit_whoami.md                     # Query live identity & karma stats
+│   ├── reddit_account_health.md             # Verify OAuth scopes, tokens & rate limits
+│   ├── reddit_get_preferences.md            # Read Reddit account preferences
+│   ├── reddit_prepare_preference_change.md  # Two-stage preference patch plan
+│   ├── reddit_get_subreddit.md              # Fetch community stats & subscriber count
+│   ├── reddit_get_subreddit_rules.md        # Retrieve moderation rules & guidelines
+│   ├── reddit_get_post_requirements.md      # Check title regex, required flairs & limits
+│   ├── reddit_search.md                     # Keyless multi-tier submission search
+│   ├── reddit_get_post.md                   # Retrieve full post body & metadata
+│   ├── reddit_get_comments.md               # Fetch nested discussion hierarchy
+│   ├── reddit_edit_own_content.md           # Edit selftext or comment body
+│   ├── reddit_delete_own_content.md         # Destructive deletion of owned content
+│   ├── reddit_get_inbox.md                  # Inspect unread messages, PMs & replies
+│   ├── reddit_diagnose_issue.md             # Deterministic failure root-cause analysis
+│   ├── reddit_plan_repair.md                # Remediation plan generation
+│   └── reddit_apply_safe_repair.md          # Automated execution of safe repairs
+└── scripts/                                 # Deterministic test & audit utilities
+    ├── verify_experience_grammar.py         # Linter for 25-55 words, anchors & disclosures
+    └── audit_karma_ratio.py                 # Auditor for Reddit 90/10 karma ratio
 ```
 
 ---
 
-## Quick Trigger Phrases
+## 4-Phase Core Autonomous Loop
 
-- `"Find Reddit opportunities for my product this week"`
-- `"Scan r/SaaS and r/startups for people asking for my tool"`
-- `"Draft experience-grammar replies for top Reddit threads"`
-- `"Audit our Reddit account health and 90/10 karma ratio"`
-- `"Execute approved Reddit replies safely"`
-
----
-
-## The 4-Phase Autonomous Agent Loop
-
-### Phase 1: Onboard Product Context (Executed Once)
-
-The agent requests or reads `ProductContext` from `.reddit-agent/product.json` or user inputs:
-- `product_name`: Official tool/service name.
-- `value_prop`: One-line core value proposition.
-- `icp_target`: Ideal customer profile and buyer persona.
-- `pain_points`: Specific friction points your product removes.
-- `competitors`: Competitors buyers commonly express frustration with.
-- `target_subreddits`: 5–15 focused communities where target users discuss workflows.
-- `high_intent_phrases`: Exact search phrases reflecting urgent purchase/tool needs.
-- `affiliation_disclosure`: Honest affiliation statement (e.g., `"Full disclosure: I am building X"`).
-
----
-
-### Phase 2: Autonomous Opportunity Discovery & Scoring
-
-Call MCP tool: `reddit_discover_opportunities`
-
-```json
-{
-  "product_name": "MyTool",
-  "value_prop": "Local-first automated testing operator",
-  "icp_target": "Founders and engineers",
-  "target_subreddits": ["SaaS", "webdev", "indiehackers"],
-  "pain_points": ["flaky tests", "slow CI pipelines", "complex mock setups"],
-  "competitors": ["legacy-runner", "manual-qa"],
-  "high_intent_phrases": ["test runner recommendation", "how to speed up vitest"],
-  "affiliation_disclosure": "Full disclosure: I work on MyTool",
-  "limit_per_sub": 15
-}
+```mermaid
+flowchart TD
+    A["1. Discovery & Intent Scoring"] -->|"RankedOpportunity"| B["2. Experience-Grammar Drafting"]
+    B -->|"25-55 Words + Disclosure"| C["3. Two-Stage Cryptographic Plan"]
+    C -->|"SHA-256 Signed ActionPlan"| D["4. Supervisor Approval & Publishing"]
+    D -->|"Published & Audited"| E["5. Community Health & Ratio Audit"]
 ```
 
-#### Deterministic Discovery & Scoring Rules:
-1. **Multi-Source Scraping:** Attempts public JSON and Shreddit listings first. Automatically recovers missing or 403-blocked threads via Arctic Shift archive.
-2. **Untrusted Data Sanitization:** Runs regex and string sanitization over all OP titles and bodies to neutralize prompt injection attacks (`"ignore previous instructions"`, `<script>`, etc.).
-3. **Intent Signal Classification:**
-   - `RecommendationAsk` ($0.90$ signal): OP actively asking for software recommendations.
-   - `UrgentWorkflow` ($0.90$ signal): OP blocked by immediate operational obstacle.
-   - `ExpressedPain` ($0.75$ signal): OP venting friction that product resolves.
-   - `CompetitorFrustration` ($0.60$ signal): OP frustrated with alternative tool.
-4. **Relevance Floor & Bounded Viral Engagement:**
-   $$\text{Rank} = \text{Relevance} + \min\left(0.25, \frac{\log_{10}(\text{Score} + \text{Comments} + 1)}{20}\right)$$
-   Guarantees that viral off-topic threads (memes, relationship drama) can never outrank on-topic threads.
+### Phase 1: Opportunity Discovery
+Run [reddit_discover_opportunities](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_discover_opportunities.md) with `ProductContext`. 
+- Multi-tier keyless scraping (Public Shreddit + Arctic Shift fallback).
+- Untrusted input sanitization against prompt injection.
+- Signal classification: `RecommendationAsk` ($0.90$), `UrgentWorkflow` ($0.90$), `ExpressedPain` ($0.75$), `CompetitorFrustration` ($0.60$).
+- Bounded viral score dampening: Viral memes never outrank high-intent questions.
+- Detailed steps: [playbook-opportunity-hunting.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-opportunity-hunting.md).
+
+### Phase 2: Experience-Grammar Drafting
+Run [reddit_draft_response](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_draft_response.md).
+- **Format:** Exactly 25–55 words (2–3 punchy sentences).
+- **Grammar Anchor:** First-person experiential (`"I ran into this..."`, `"In our case..."`). Advice grammar (`"You should..."`) is prohibited.
+- **Hedge:** At least one realistic engineering hedge (`"YMMV"`, `"depends on your setup"`).
+- **Disclosure Gate:** Mandatory affiliation disclaimer in the same sentence if product is mentioned.
+- Validation utility: [scripts/verify_experience_grammar.py](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/scripts/verify_experience_grammar.py).
+- Detailed steps: [playbook-experience-drafting.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-experience-drafting.md).
+
+### Phase 3: Cryptographic Action Plan & Approval
+Run [reddit_prepare_comment](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_prepare_comment.md) or [reddit_prepare_post](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_prepare_post.md).
+- Emits pending `ActionPlan` with SHA-256 payload checksum:
+  $$\text{Hash} = \text{SHA256}(\text{account} + \text{thing\_id} + \text{body} + \text{salt})$$
+- Run [reddit_approve_action](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_approve_action.md) to grant execution authorization.
+- Detailed steps: [playbook-verified-publishing.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-verified-publishing.md).
+
+### Phase 4: Verified Publishing & Ratio Auditing
+Run [reddit_publish_prepared_comment](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_publish_prepared_comment.md) followed by [reddit_audit_community_ratio](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_audit_community_ratio.md).
+- Validates hash integrity before making network requests.
+- Adheres to Reddit's 90/10 organic participation rule ($> 90\%$ organic discussion, $< 10\%$ promotional links).
+- Detailed steps: [playbook-community-building.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-community-building.md).
 
 ---
 
-### Phase 3: Autonomous Experience-Grammar Drafting
+## Specialized Playbooks
 
-Call MCP tool: `reddit_draft_response`
-
-```json
-{
-  "opportunity": { ... }, // RankedOpportunity from Phase 2
-  "product": { ... }       // ProductContext
-}
-```
-
-#### Strict Anti-Slop & Quality Gates:
-- **Experience Grammar (Mandatory):**
-  - ✅ **Allowed:** `"I ran into this exact issue..."`, `"What worked for me was..."`, `"In my experience..."`, `"What fixed it for me..."`.
-  - ❌ **Forbidden:** `"You should..."`, `"You need to..."`, `"The best way is..."`, `"I'd just..."`, `"Step 1: ..."` (advice/support grammar).
-- **Length Constraint:** Exactly **25 to 55 words** (2–3 punchy sentences). Long replies read as artificial marketing copy.
-- **Concrete Anchor:** Must react directly to a specific detail the OP mentioned.
-- **One Hedge:** Include at least one honest hedge (`"at least in my case..."`).
-- **Product Naming Gate & Honest Disclosure:**
-  - Only name the product if OP is explicitly shopping for a solution **AND** product fit score $\ge 0.65$.
-  - If named, the affiliation disclaimer must be stated in the exact same sentence.
-  - If the gate fails, draft a pure-value answer without mentioning the product name.
+| Playbook | Objective | Primary Tools |
+|----------|-----------|---------------|
+| [playbook-opportunity-hunting.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-opportunity-hunting.md) | High-intent thread discovery | `reddit_discover_opportunities`, `reddit_search` |
+| [playbook-experience-drafting.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-experience-drafting.md) | Anti-slop 25-55w response generation | `reddit_draft_response`, `verify_experience_grammar.py` |
+| [playbook-verified-publishing.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-verified-publishing.md) | Tamper-proof 2-stage execution | `reddit_prepare_comment`, `reddit_approve_action`, `reddit_publish_prepared_comment` |
+| [playbook-community-building.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-community-building.md) | 90/10 ratio defense & karma health | `reddit_audit_community_ratio`, `reddit_account_health`, `reddit_whoami` |
+| [playbook-incident-diagnosis.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-incident-diagnosis.md) | Automated failure triage & repair | `reddit_diagnose_issue`, `reddit_plan_repair`, `reddit_apply_safe_repair` |
+| [playbook-reddit-2-skill.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-reddit-2-skill.md) | Consensus mining into Agent Skills | `reddit_2_skill`, `reddit_search`, `reddit_get_comments` |
 
 ---
 
-### Phase 4: Tamper-Proof Cryptographic Action Plan & Publication
+## Anti-Slop & Safety Invariants
 
-To guarantee security and eliminate accidental spam:
-
-1. **Prepare Action Plan:** Call MCP tool `reddit_prepare_comment`
-   - Generates a pending action with a SHA-256 cryptographic signature:
-     $$\text{Hash} = \text{SHA256}(\text{account} + \text{thing\_id} + \text{text} + \text{salt})$$
-2. **Review & Human Approval Gate:** Call MCP tool `reddit_approve_action`
-   - The user or supervising workflow inspects the exact diff and confirms approval.
-   - Unapproved actions fail closed and cannot mutate state.
-3. **Execute & Publish:** Call MCP tool `reddit_publish_prepared_comment`
-   - Verifies the cryptographic hash matches the original un-tampered plan.
-   - Publishes via authenticated Reddit OAuth2 driver with strict rate-limit backoff.
-4. **Account Ratio Audit:** Call MCP tool `reddit_audit_community_ratio`
-   - Validates that the account maintains at least a 90% organic value-to-promotion ratio.
+1. **The Fail-Closed Mutation Gate:** Direct, un-hashed network mutations are prohibited. Every post, comment, and preference change must originate from a verified `ActionPlan`.
+2. **The Experience Grammar Invariant:** Never address the user with prescriptive commands (`"You should use X"`). Always frame advice from personal experience (`"When we encountered this, we solved it by..."`).
+3. **The Anti-Slop Ban:** Commercial hype words (`"game changer"`, `"revolutionary"`, `"must-have"`, `"look no further"`, `"seamlessly integrates"`) trigger immediate test failure.
+4. **Mandatory Affiliation Disclosure:** Whenever a tool, repo, or service built by the author is mentioned, the disclaimer (`"Full disclosure: I work on X"`) must appear in the exact same sentence.
+5. **Prompt Injection Immunity:** All raw thread text, titles, and comment bodies from Reddit are treated as untrusted data and sanitized before prompt ingestion.
 
 ---
 
-## Command Line Equivalents
+## Native CLI Bridge
 
 ```bash
-# Start MCP server for IDE / AI Agent integration
-reddit-agent mcp
+# Start MCP server for Antigravity, Claude, or Cursor
+cargo run --bin reddit-agent -- mcp
 
-# List all configured accounts and verify health
-reddit-agent account list
-reddit-agent account health
+# Keyless opportunity discovery via CLI
+cargo run --bin reddit-agent -- discover \
+  --product "Acme" \
+  --value-prop "Fastest JSON logger" \
+  --subreddits "rust,programming"
 
-# Prepare a post with dry-run validation
-reddit-agent post prepare --subreddit SaaS --title "Experience scaling local agents" --body "..."
+# Synthesize a complete OmniSkill from Reddit discussions
+cargo run --bin reddit-agent -- 2-skill \
+  --topic "PostgreSQL index bloat mitigation" \
+  --subreddits "PostgreSQL,database"
 
-# Review and approve action plans
-reddit-agent action list
-reddit-agent action approve <ACTION_ID>
-reddit-agent action execute <ACTION_ID>
+# Review & approve pending action plans
+cargo run --bin reddit-agent -- action list
+cargo run --bin reddit-agent -- action approve <ACTION_ID>
+cargo run --bin reddit-agent -- action execute <ACTION_ID>
 ```
-
----
-
-## Ethical Standards & Content Policy
-
-1. **Honest Attribution:** Never impersonate third-party consumers. Disclose your affiliation whenever a product or service is mentioned.
-2. **No Astroturfing:** Coordinated sockpuppet upvoting, fake grassroots consensus, and vote rings are strictly banned.
-3. **Community Respect:** Obey subreddit rules and wiki guidelines. If a community prohibits product mentions entirely, stay in 100% pure help mode without product naming.
-4. **Data Isolation:** All session tokens, keyrings, and Chrome profiles remain local on the user's physical machine. No data is exfiltrated to external telemetry servers.
