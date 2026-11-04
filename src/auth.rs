@@ -1,3 +1,5 @@
+pub mod secret_manager;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
