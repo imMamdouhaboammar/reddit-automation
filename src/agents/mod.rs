@@ -4,6 +4,7 @@ pub mod orchestrator;
 pub mod reddit_2_skill;
 pub mod router;
 pub mod tool_agents;
+pub mod velocity;
 
 pub use community_builder::{
     BrandMention, CommunityBuilderWorker, CommunityProfile, ContentStrategy, EngagementRecord,
@@ -19,3 +20,4 @@ pub use router::{DagStep, DagWave, DynamicRouter, ExecutionDag, IntentCategory};
 pub use tool_agents::{
     DiggerAgent, DrafterAgent, MinerAgent, OrchestrationContext, ToolAgent,
 };
+pub use velocity::{InteractionVerdict, VelocityGovernor};
