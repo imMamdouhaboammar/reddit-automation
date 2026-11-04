@@ -36,7 +36,7 @@ metadata:
 
 Automate high-intent community discovery, experience-grammar drafting, disclosure-compliant publishing, and knowledge synthesis on Reddit with zero spam, zero astroturfing, and cryptographic fail-closed safety.
 
-Powered by [`reddit-agent`](https://github.com/imMamdouhaboammar/reddit-agent) native Rust core with 26 Model Context Protocol (MCP) tools.
+Powered by [`reddit-agent`](https://github.com/imMamdouhaboammar/reddit-agent) native Rust core with 28 Model Context Protocol (MCP) tools.
 
 ---
 
@@ -45,22 +45,24 @@ Powered by [`reddit-agent`](https://github.com/imMamdouhaboammar/reddit-agent) n
 This skill follows the **OmniSkill Tripartite Architecture**:
 - **Router (`SKILL.md`)**: High-level execution lifecycle, safety invariants, and capability dispatch (this file).
 - **Playbooks (`playbooks/`)**: Step-by-step procedures for autonomous workflows.
-- **Tool References (`references/tools/`)**: In-depth contracts, schemas, and examples for all 26 MCP tools.
+- **Tool References (`references/tools/`)**: In-depth contracts, schemas, and examples for all 28 MCP tools.
 - **Scripts (`scripts/`)**: Deterministic validation and audit CLI utilities.
 
 ```
 skills/reddit-automation/
 ├── SKILL.md                                 # High-density execution router (< 500 lines)
 ├── playbooks/                               # End-to-end operational workflows
-│   ├── playbook-opportunity-hunting.md      # Multi-tier thread discovery & intent scoring
+│   ├── playbook-opportunity-hunting.md      # Multi-tier thread discovery & intent scoring (Digger & Miner)
 │   ├── playbook-experience-drafting.md      # 25-55 word Experience Grammar drafting
 │   ├── playbook-verified-publishing.md      # Two-stage cryptographic ActionPlan execution
 │   ├── playbook-community-building.md       # Karma health, 90/10 ratio & AutoMod defenses
 │   ├── playbook-incident-diagnosis.md       # Root-cause error triage & automated repair
 │   └── playbook-reddit-2-skill.md           # Consensus mining to synthesize OmniSkills
-├── references/tools/                        # Complete technical docs for all 26 tools
+├── references/tools/                        # Complete technical docs for all 28 tools
 │   ├── README.md                            # Comprehensive tool index & taxonomy
-│   ├── reddit_discover_opportunities.md     # Scrape & score high-intent threads
+│   ├── reddit_digger.md                     # Deep candidate source discovery & mapping
+│   ├── reddit_miner.md                      # Deep content extraction & intent classification
+│   ├── reddit_discover_opportunities.md     # Composite pipeline (digger + miner)
 │   ├── reddit_draft_response.md             # Draft Experience Grammar reply
 │   ├── reddit_audit_community_ratio.md      # Audit 90/10 content-to-promo balance
 │   ├── reddit_2_skill.md                    # Mine Reddit and generate Agent Skills
@@ -97,18 +99,17 @@ skills/reddit-automation/
 
 ```mermaid
 flowchart TD
-    A["1. Discovery & Intent Scoring"] -->|"RankedOpportunity"| B["2. Experience-Grammar Drafting"]
+    A1["1a. reddit-digger: Candidate Source Discovery"] -->|"DiggerResult (Sources & URLs)"| A2["1b. reddit-miner: Content Extraction & Intent Scoring"]
+    A2 -->|"RankedOpportunity"| B["2. Experience-Grammar Drafting"]
     B -->|"25-55 Words + Disclosure"| C["3. Two-Stage Cryptographic Plan"]
     C -->|"SHA-256 Signed ActionPlan"| D["4. Supervisor Approval & Publishing"]
     D -->|"Published & Audited"| E["5. Community Health & Ratio Audit"]
 ```
 
-### Phase 1: Opportunity Discovery
-Run [reddit_discover_opportunities](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_discover_opportunities.md) with `ProductContext`. 
-- Multi-tier keyless scraping (Public Shreddit + Arctic Shift fallback).
-- Untrusted input sanitization against prompt injection.
-- Signal classification: `RecommendationAsk` ($0.90$), `UrgentWorkflow` ($0.90$), `ExpressedPain` ($0.75$), `CompetitorFrustration` ($0.60$).
-- Bounded viral score dampening: Viral memes never outrank high-intent questions.
+### Phase 1: Opportunity Hunting (Digger & Miner)
+1. **Source Candidate Discovery:** Run [reddit_digger](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_digger.md) to deeply map target subreddits and query phrases, retrieving candidate source URLs and metrics via multi-tier scraping (Public Shreddit + Arctic Shift fallback).
+2. **Content Extraction & Intent Classification:** Run [reddit_miner](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_miner.md) to inspect thread content, sanitize prompt injections, detect intent signals (`RecommendationAsk` $0.90$, `UrgentWorkflow` $0.90$, `ExpressedPain` $0.75$, `CompetitorFrustration` $0.60$), and rank opportunities.
+- Single-turn composite call: [reddit_discover_opportunities](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_discover_opportunities.md).
 - Detailed steps: [playbook-opportunity-hunting.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-opportunity-hunting.md).
 
 ### Phase 2: Experience-Grammar Drafting
@@ -139,7 +140,7 @@ Run [reddit_publish_prepared_comment](file:///Users/mamdouhaboammar/Documents/M-
 
 | Playbook | Objective | Primary Tools |
 |----------|-----------|---------------|
-| [playbook-opportunity-hunting.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-opportunity-hunting.md) | High-intent thread discovery | `reddit_discover_opportunities`, `reddit_search` |
+| [playbook-opportunity-hunting.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-opportunity-hunting.md) | Deep source aggregation & intent mining | `reddit_digger`, `reddit_miner`, `reddit_search` |
 | [playbook-experience-drafting.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-experience-drafting.md) | Anti-slop 25-55w response generation | `reddit_draft_response`, `verify_experience_grammar.py` |
 | [playbook-verified-publishing.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-verified-publishing.md) | Tamper-proof 2-stage execution | `reddit_prepare_comment`, `reddit_approve_action`, `reddit_publish_prepared_comment` |
 | [playbook-community-building.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/playbooks/playbook-community-building.md) | 90/10 ratio defense & karma health | `reddit_audit_community_ratio`, `reddit_account_health`, `reddit_whoami` |
@@ -164,11 +165,11 @@ Run [reddit_publish_prepared_comment](file:///Users/mamdouhaboammar/Documents/M-
 # Start MCP server for Antigravity, Claude, or Cursor
 cargo run --bin reddit-agent -- mcp
 
-# Keyless opportunity discovery via CLI
-cargo run --bin reddit-agent -- discover \
-  --product "Acme" \
-  --value-prop "Fastest JSON logger" \
-  --subreddits "rust,programming"
+# Deep candidate source discovery (reddit-digger)
+cargo run --bin reddit-agent -- opportunity dig --subreddit SaaS --query "recommendation" --limit 15
+
+# Deep content extraction and intent scoring (reddit-miner)
+cargo run --bin reddit-agent -- opportunity mine --subreddit SaaS --product "Acme" --limit 10
 
 # Synthesize a complete OmniSkill from Reddit discussions
 cargo run --bin reddit-agent -- 2-skill \

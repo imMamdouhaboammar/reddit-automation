@@ -11,7 +11,9 @@ These tools operate with keyless scraping fallbacks (Public Shreddit + Arctic Sh
 
 | Tool | Description | Documentation |
 |------|-------------|---------------|
-| `reddit_discover_opportunities` | Multi-tier scraping & intent scoring across subreddits | [reddit_discover_opportunities.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_discover_opportunities.md) |
+| `reddit_digger` | Deep candidate source gatherer: maps where to search & aggregates threads | [reddit_digger.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_digger.md) |
+| `reddit_miner` | Deep content analyzer: sanitizes text, classifies intent signals & ranks opportunities | [reddit_miner.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_miner.md) |
+| `reddit_discover_opportunities` | Unified pipeline: runs digger then miner in one call (legacy alias) | [reddit_discover_opportunities.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_discover_opportunities.md) |
 | `reddit_draft_response` | Draft 25-55 word Experience Grammar replies with mandatory disclosure | [reddit_draft_response.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_draft_response.md) |
 | `reddit_audit_community_ratio` | Audit karma & history against Reddit's 90/10 content-to-promo rule | [reddit_audit_community_ratio.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_audit_community_ratio.md) |
 | `reddit_2_skill` | Mine Reddit consensus & engineer production Agent Skill packages | [reddit_2_skill.md](file:///Users/mamdouhaboammar/Documents/M-Research/reddit-automation%20/skills/reddit-automation/references/tools/reddit_2_skill.md) |

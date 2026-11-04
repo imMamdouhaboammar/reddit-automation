@@ -7,7 +7,7 @@ use tracing::info;
 use crate::accounts::AccountManager;
 use crate::actions::{ActionManager, RiskLevel};
 use crate::agents::community_builder::CommunityBuilderWorker;
-use crate::agents::opportunity::{OpportunityWorker, ProductContext, RankedOpportunity};
+use crate::agents::opportunity::{DiggerSource, OpportunityWorker, ProductContext, RankedOpportunity};
 use crate::drivers::reddit_keyless::RedditKeylessDriver;
 use crate::drivers::Capability;
 use crate::issues::IssueEngine;
@@ -319,8 +319,34 @@ impl McpServer {
                 }
             },
             {
+                "name": "reddit_digger",
+                "description": "Deep candidate source gatherer (reddit-digger). Scans and maps where search happens, executes multi-tier scraping (Public Shreddit + Arctic Shift archive), and gathers candidate threads with canonical URLs, metrics, and previews.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["target_subreddits"],
+                    "properties": {
+                        "product_name": { "type": "string", "description": "Optional name of product/context." },
+                        "target_subreddits": { "type": "array", "items": { "type": "string" }, "description": "List of subreddits to deeply scan (e.g. ['SaaS', 'startups'])." },
+                        "high_intent_phrases": { "type": "array", "items": { "type": "string" }, "description": "Search phrases or question queries." },
+                        "limit_per_sub": { "type": "integer", "description": "Max threads to collect per subreddit (default: 15)." }
+                    }
+                }
+            },
+            {
+                "name": "reddit_miner",
+                "description": "Deep content extraction and opportunity analyzer (reddit-miner). Takes candidate sources from reddit_digger, extracts full text, sanitizes prompt injection, detects intent signals (RecommendationAsk, ExpressedPain, CompetitorFrustration, UrgentWorkflow), scores product fit, and ranks opportunities.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["sources", "product"],
+                    "properties": {
+                        "sources": { "type": "array", "items": { "type": "object" }, "description": "Array of DiggerSource objects returned by reddit_digger." },
+                        "product": { "type": "object", "description": "ProductContext object containing product_name, pain_points, competitors, etc." }
+                    }
+                }
+            },
+            {
                 "name": "reddit_discover_opportunities",
-                "description": "Discover high-intent Reddit opportunities from target subreddits using multi-tier scraping (Public Shreddit + Arctic Shift fallback) and intent scoring (recommendation ask, expressed pain, competitor frustration, workflow urgency).",
+                "description": "Unified discovery pipeline: runs reddit_digger followed by reddit_miner to find and rank high-intent Reddit opportunities in a single call.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["product_name", "value_prop", "target_subreddits"],
@@ -344,7 +370,7 @@ impl McpServer {
                     "type": "object",
                     "required": ["opportunity", "product"],
                     "properties": {
-                        "opportunity": { "type": "object", "description": "RankedOpportunity returned by reddit_discover_opportunities." },
+                        "opportunity": { "type": "object", "description": "RankedOpportunity returned by reddit_miner or reddit_discover_opportunities." },
                         "product": { "type": "object", "description": "ProductContext object." }
                     }
                 }
@@ -397,6 +423,53 @@ impl McpServer {
                 .map_err(|e| format!("reddit-2-skill failed: {}", e))?;
 
             return Ok(json!(package));
+        }
+
+        if name == "reddit_digger" || name == "reddit-digger" {
+            let subreddits: Vec<String> = args["target_subreddits"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let high_intent_phrases: Vec<String> = args["high_intent_phrases"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let limit_per_sub = args["limit_per_sub"].as_u64().unwrap_or(15) as usize;
+
+            let keyless_driver = RedditKeylessDriver::new();
+            let threads = keyless_driver
+                .discover_threads(&subreddits, &high_intent_phrases, limit_per_sub)
+                .await;
+
+            let digger_result = OpportunityWorker::dig_sources(&threads, &subreddits, &high_intent_phrases);
+            return Ok(json!(digger_result));
+        }
+
+        if name == "reddit_miner" || name == "reddit-miner" {
+            let sources: Vec<DiggerSource> = serde_json::from_value(args["sources"].clone())
+                .unwrap_or_else(|_| {
+                    // Try parsing as raw threads if passed directly
+                    let threads: Vec<crate::agents::opportunity::RedditThread> =
+                        serde_json::from_value(args["sources"].clone()).unwrap_or_default();
+                    threads.iter().map(DiggerSource::from).collect()
+                });
+
+            let product: ProductContext = serde_json::from_value(args["product"].clone())
+                .map_err(|e| format!("Invalid product payload: {}", e))?;
+
+            let now_utc = chrono::Utc::now().timestamp();
+            let miner_result = OpportunityWorker::mine_content(&sources, &product, now_utc);
+            return Ok(json!(miner_result));
         }
 
         if name == "reddit_discover_opportunities" {
@@ -462,9 +535,10 @@ impl McpServer {
                 .discover_threads(&subreddits, &high_intent_phrases, limit_per_sub)
                 .await;
 
+            let digger_result = OpportunityWorker::dig_sources(&threads, &subreddits, &high_intent_phrases);
             let now_utc = chrono::Utc::now().timestamp();
-            let ranked = OpportunityWorker::discover_opportunities(&threads, &product, now_utc);
-            return Ok(json!(ranked));
+            let miner_result = OpportunityWorker::mine_content(&digger_result.sources, &product, now_utc);
+            return Ok(json!(miner_result.opportunities));
         }
 
         if name == "reddit_draft_response" {
@@ -1029,9 +1103,51 @@ mod tests {
         assert_eq!(res["identity"]["name"], "tester");
 
         // Verify newly added opportunity and community audit tools are present in tools list
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_digger"));
+        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_miner"));
         assert!(tools_arr.iter().any(|t| t["name"] == "reddit_discover_opportunities"));
         assert!(tools_arr.iter().any(|t| t["name"] == "reddit_draft_response"));
         assert!(tools_arr.iter().any(|t| t["name"] == "reddit_audit_community_ratio"));
+
+        let sample_product = json!({
+            "product_name": "RedditAgent",
+            "value_prop": "Local-first multi-account Reddit operator",
+            "icp_target": "SaaS Founders",
+            "pain_points": ["spammy bots", "wasting hours"],
+            "competitors": ["spam-blaster"],
+            "target_subreddits": ["SaaS"],
+            "high_intent_phrases": ["tool recommendation"],
+            "affiliation_disclosure": "Full disclosure: I built RedditAgent"
+        });
+
+        // Call reddit_miner on sample source
+        let sample_source = json!([{
+            "id": "thread_123",
+            "subreddit": "SaaS",
+            "title": "Need tool recommendation for finding customers without spam",
+            "author": "founder_x",
+            "score": 15,
+            "num_comments": 8,
+            "created_utc": 1700000000,
+            "permalink": "/r/SaaS/comments/thread_123/",
+            "canonical_url": "https://reddit.com/r/SaaS/comments/thread_123/",
+            "body_snippet": "Does anyone know a good alternative to spammy reddit scrapers?",
+            "full_body": "Does anyone know a good alternative to spammy reddit scrapers?"
+        }]);
+
+        let miner_res = server
+            .handle_tool_call(
+                "reddit_miner",
+                json!({
+                    "sources": sample_source,
+                    "product": sample_product
+                }),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(miner_res["analyzed_count"], 1);
+        assert_eq!(miner_res["opportunities"][0]["thread"]["id"], "thread_123");
 
         // Call reddit_draft_response tool without requiring an account
         let sample_opp = json!({
@@ -1052,17 +1168,6 @@ mod tests {
             "composite_score": 0.88,
             "detected_signals": ["RecommendationAsk", "UrgentWorkflow"],
             "opportunity_reason": "OP is asking for recommendation"
-        });
-
-        let sample_product = json!({
-            "product_name": "RedditAgent",
-            "value_prop": "Local-first multi-account Reddit operator",
-            "icp_target": "SaaS Founders",
-            "pain_points": ["spammy bots", "wasting hours"],
-            "competitors": ["spam-blaster"],
-            "target_subreddits": ["SaaS"],
-            "high_intent_phrases": ["tool recommendation"],
-            "affiliation_disclosure": "Full disclosure: I built RedditAgent"
         });
 
         let draft_res = server

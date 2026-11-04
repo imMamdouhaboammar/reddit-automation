@@ -110,10 +110,114 @@ pub struct OpportunityDraft {
     pub review_status: ReviewStatus,
 }
 
+/// A candidate source thread gathered deeply by `reddit-digger`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DiggerSource {
+    pub id: String,
+    pub subreddit: String,
+    pub title: String,
+    pub author: String,
+    pub score: i64,
+    pub num_comments: u32,
+    pub created_utc: i64,
+    pub permalink: String,
+    pub canonical_url: String,
+    pub body_snippet: String,
+    #[serde(default)]
+    pub full_body: Option<String>,
+}
+
+impl From<&RedditThread> for DiggerSource {
+    fn from(t: &RedditThread) -> Self {
+        let snippet = if t.body.chars().count() > 280 {
+            format!("{}...", t.body.chars().take(280).collect::<String>())
+        } else {
+            t.body.clone()
+        };
+        Self {
+            id: t.id.clone(),
+            subreddit: t.subreddit.clone(),
+            title: t.title.clone(),
+            author: t.author.clone(),
+            score: 0,
+            num_comments: t.num_comments,
+            created_utc: t.created_utc,
+            permalink: format!("/r/{}/comments/{}/", t.subreddit, t.id),
+            canonical_url: t.canonical_url(),
+            body_snippet: snippet,
+            full_body: Some(t.body.clone()),
+        }
+    }
+}
+
+/// The structured result of running `reddit-digger`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DiggerResult {
+    pub target_subreddits: Vec<String>,
+    pub queries_executed: Vec<String>,
+    pub total_sources: usize,
+    pub sources: Vec<DiggerSource>,
+}
+
+/// The structured result of running `reddit-miner`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MinerResult {
+    pub analyzed_count: usize,
+    pub opportunities: Vec<RankedOpportunity>,
+}
+
 /// Fully autonomous Opportunity Worker implementing the `reddit-automation` skill playbook.
 pub struct OpportunityWorker;
 
 impl OpportunityWorker {
+    /// Extracts and aggregates DiggerSource candidates from Reddit threads (reddit-digger).
+    pub fn dig_sources(
+        threads: &[RedditThread],
+        subreddits: &[String],
+        queries: &[String],
+    ) -> DiggerResult {
+        let sources: Vec<DiggerSource> = threads
+            .iter()
+            .filter(|t| !t.is_locked && !t.is_archived)
+            .map(DiggerSource::from)
+            .collect();
+
+        DiggerResult {
+            target_subreddits: subreddits.to_vec(),
+            queries_executed: queries.to_vec(),
+            total_sources: sources.len(),
+            sources,
+        }
+    }
+
+    /// Mines content, sanitizes untrusted input, classifies intent signals, and ranks opportunities (reddit-miner).
+    pub fn mine_content(
+        sources: &[DiggerSource],
+        product: &ProductContext,
+        now_utc: i64,
+    ) -> MinerResult {
+        let threads: Vec<RedditThread> = sources
+            .iter()
+            .map(|s| RedditThread {
+                id: s.id.clone(),
+                subreddit: s.subreddit.clone(),
+                title: s.title.clone(),
+                body: s.full_body.clone().unwrap_or_else(|| s.body_snippet.clone()),
+                author: s.author.clone(),
+                created_utc: s.created_utc,
+                num_comments: s.num_comments,
+                is_locked: false,
+                is_archived: false,
+                url: s.canonical_url.clone(),
+            })
+            .collect();
+
+        let opportunities = Self::discover_opportunities(&threads, product, now_utc);
+        MinerResult {
+            analyzed_count: opportunities.len(),
+            opportunities,
+        }
+    }
     /// Sanitizes untrusted Reddit text to neutralize prompt injection attacks.
     pub fn sanitize_untrusted_content(text: &str) -> String {
         let injection_phrases = [
@@ -501,5 +605,55 @@ mod tests {
         assert!(draft.product_named);
         assert!(draft.affiliation_disclosed);
         assert_eq!(draft.review_status, ReviewStatus::PendingHumanReview);
+    }
+
+    #[test]
+    fn test_reddit_digger_and_miner_split() {
+        let product = ProductContext::default();
+        let threads = vec![
+            RedditThread {
+                id: "d1".to_string(),
+                subreddit: "SaaS".to_string(),
+                title: "Need recommendations for customer outreach tools".to_string(),
+                body: "Any alternative to spam-blaster that doesn't get banned?".to_string(),
+                author: "founder1".to_string(),
+                created_utc: 1200,
+                num_comments: 5,
+                is_locked: false,
+                is_archived: false,
+                url: "https://reddit.com/r/SaaS/comments/d1/".to_string(),
+            },
+            RedditThread {
+                id: "d2_locked".to_string(),
+                subreddit: "SaaS".to_string(),
+                title: "Locked thread".to_string(),
+                body: "Spam".to_string(),
+                author: "spammer".to_string(),
+                created_utc: 1100,
+                num_comments: 0,
+                is_locked: true,
+                is_archived: false,
+                url: "https://reddit.com/r/SaaS/comments/d2/".to_string(),
+            },
+        ];
+
+        // 1. Digger aggregates candidate sources deeply
+        let digger_res = OpportunityWorker::dig_sources(
+            &threads,
+            &["SaaS".to_string()],
+            &["recommendations".to_string()],
+        );
+        assert_eq!(digger_res.total_sources, 1);
+        assert_eq!(digger_res.sources[0].id, "d1");
+        assert_eq!(digger_res.sources[0].canonical_url, "https://reddit.com/r/SaaS/comments/d1/");
+
+        // 2. Miner analyzes content, intent signals, and ranks
+        let miner_res = OpportunityWorker::mine_content(&digger_res.sources, &product, 1500);
+        assert_eq!(miner_res.analyzed_count, 1);
+        let opp = &miner_res.opportunities[0];
+        assert_eq!(opp.thread.id, "d1");
+        assert!(opp.detected_signals.contains(&OpportunitySignal::RecommendationAsk));
+        assert!(opp.detected_signals.contains(&OpportunitySignal::CompetitorFrustration));
+        assert!(opp.composite_score > 0.70);
     }
 }

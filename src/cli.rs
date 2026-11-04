@@ -114,7 +114,33 @@ pub enum Commands {
 
 #[derive(Subcommand)]
 pub enum OpportunitySubcommand {
-    /// Discover high-intent opportunities from a subreddit
+    /// Deeply determine search targets and gather source candidates (reddit-digger)
+    Dig {
+        #[arg(long, short, help = "Target subreddit (e.g. SaaS)")]
+        subreddit: String,
+        #[arg(long, default_value = "", help = "Search query or phrase")]
+        query: String,
+        #[arg(long, default_value = "15")]
+        limit: usize,
+        #[arg(long, default_value = "text", help = "Output format: text, json, md")]
+        format: String,
+    },
+    /// Extract content, classify intent signals, and rank opportunities (reddit-miner)
+    Mine {
+        #[arg(long, short, help = "Target subreddit (e.g. SaaS)")]
+        subreddit: String,
+        #[arg(long, default_value = "MyProduct", help = "Product or tool name")]
+        product: String,
+        #[arg(long, default_value = "Automates workflow with local-first security")]
+        value_prop: String,
+        #[arg(long, default_value = "10")]
+        limit: usize,
+        #[arg(long, default_value = "text", help = "Output format: text, json, md")]
+        format: String,
+        #[arg(long, help = "Optional file path to write output artifact")]
+        output: Option<PathBuf>,
+    },
+    /// Unified discovery: runs reddit-digger then reddit-miner
     Discover {
         #[arg(long, short, help = "Target subreddit (e.g. SaaS)")]
         subreddit: String,
@@ -828,6 +854,144 @@ impl AppContext {
             },
 
             Commands::Opportunity { subcommand } => match subcommand {
+                OpportunitySubcommand::Dig {
+                    subreddit,
+                    query,
+                    limit,
+                    format,
+                } => {
+                    let queries = if query.is_empty() {
+                        vec!["recommendation".to_string(), "tool".to_string(), "alternative".to_string()]
+                    } else {
+                        vec![query]
+                    };
+
+                    println!("⛏️ Running reddit-digger on r/{}...", subreddit);
+                    let keyless = RedditKeylessDriver::new();
+                    let threads = keyless.discover_threads(&[subreddit.clone()], &queries, limit).await;
+                    let digger_result = OpportunityWorker::dig_sources(&threads, &[subreddit], &queries);
+
+                    match format.to_lowercase().as_str() {
+                        "json" => println!("{}", serde_json::to_string_pretty(&digger_result)?),
+                        _ => {
+                            println!("\nDiscovered {} sources:", digger_result.total_sources);
+                            for (i, s) in digger_result.sources.iter().enumerate() {
+                                println!(
+                                    "{}. [{}] {}\n   URL: {}\n   Comments: {} | Preview: {}\n",
+                                    i + 1,
+                                    s.subreddit,
+                                    s.title,
+                                    s.canonical_url,
+                                    s.num_comments,
+                                    s.body_snippet.chars().take(80).collect::<String>()
+                                );
+                            }
+                        }
+                    }
+                }
+
+                OpportunitySubcommand::Mine {
+                    subreddit,
+                    product,
+                    value_prop,
+                    limit,
+                    format,
+                    output,
+                } => {
+                    let product_ctx = ProductContext {
+                        product_name: product,
+                        value_prop,
+                        icp_target: "Reddit community members seeking solutions".to_string(),
+                        pain_points: vec![
+                            "wasting time".to_string(),
+                            "manual work".to_string(),
+                            "flaky tools".to_string(),
+                        ],
+                        competitors: vec!["generic-tool".to_string()],
+                        target_subreddits: vec![subreddit.clone()],
+                        high_intent_phrases: vec![
+                            "recommendation".to_string(),
+                            "alternative".to_string(),
+                            "what tool".to_string(),
+                        ],
+                        affiliation_disclosure: "Full disclosure: I am affiliated with this tool".to_string(),
+                    };
+
+                    println!("🔬 Running reddit-miner on r/{}...", subreddit);
+                    let keyless = RedditKeylessDriver::new();
+                    let threads = keyless
+                        .discover_threads(&[subreddit.clone()], &product_ctx.high_intent_phrases, limit)
+                        .await;
+
+                    let digger_res = OpportunityWorker::dig_sources(
+                        &threads,
+                        &[subreddit.clone()],
+                        &product_ctx.high_intent_phrases,
+                    );
+                    let now = chrono::Utc::now().timestamp();
+                    let miner_res = OpportunityWorker::mine_content(&digger_res.sources, &product_ctx, now);
+
+                    let ranked = miner_res.opportunities;
+                    let formatted_output = match format.to_lowercase().as_str() {
+                        "json" => serde_json::to_string_pretty(&ranked)?,
+                        "md" | "markdown" => {
+                            let mut md = String::new();
+                            md.push_str(&format!("# Mined Reddit Opportunities: r/{}\n\n", subreddit));
+                            md.push_str(&format!(
+                                "*Analyzed {} threads, identified {} high-intent opportunities for `{}`*\n\n",
+                                miner_res.analyzed_count,
+                                ranked.len(),
+                                product_ctx.product_name
+                            ));
+                            md.push_str("| # | Title | Subreddit | Score | Signals | Link |\n");
+                            md.push_str("|---|---|---|---|---|---|\n");
+                            for (i, opp) in ranked.iter().take(20).enumerate() {
+                                let clean_title = opp.thread.title.replace('|', "\\|");
+                                let signals_str = opp
+                                    .detected_signals
+                                    .iter()
+                                    .map(|s| format!("{:?}", s))
+                                    .collect::<Vec<_>>()
+                                    .join(", ");
+                                md.push_str(&format!(
+                                    "| {} | {} | r/{} | {:.2} | {} | [View Thread]({}) |\n",
+                                    i + 1,
+                                    clean_title,
+                                    opp.thread.subreddit,
+                                    opp.composite_score,
+                                    signals_str,
+                                    opp.thread.canonical_url()
+                                ));
+                            }
+                            md
+                        }
+                        _ => {
+                            let mut text = format!("\nMined {} ranked opportunities:\n\n", ranked.len());
+                            for (i, opp) in ranked.iter().take(10).enumerate() {
+                                text.push_str(&format!(
+                                    "{}. [Score: {:.2}] {} (r/{})\n   URL:     {}\n   Why:     {}\n   Signals: {:?} | Comments: {}\n\n",
+                                    i + 1,
+                                    opp.composite_score,
+                                    opp.thread.title,
+                                    opp.thread.subreddit,
+                                    opp.thread.canonical_url(),
+                                    opp.opportunity_reason,
+                                    opp.detected_signals,
+                                    opp.thread.num_comments
+                                ));
+                            }
+                            text
+                        }
+                    };
+
+                    if let Some(out_path) = output {
+                        std::fs::write(&out_path, &formatted_output)?;
+                        println!("Output saved to {}", out_path.display());
+                    } else {
+                        println!("{}", formatted_output);
+                    }
+                }
+
                 OpportunitySubcommand::Discover {
                     subreddit,
                     product,
