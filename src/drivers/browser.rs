@@ -228,7 +228,11 @@ impl HumanBehaviorEngine {
     }
 
     /// Types text character-by-character with realistic human jitter
-    pub async fn type_like_human(page: &Page, selector: &str, text: &str) -> Result<(), DriverError> {
+    pub async fn type_like_human(
+        page: &Page,
+        selector: &str,
+        text: &str,
+    ) -> Result<(), DriverError> {
         let focus_js = format!(
             r#"(() => {{
                 const el = document.querySelector({});
@@ -244,7 +248,9 @@ impl HumanBehaviorEngine {
         let focused: bool = page
             .evaluate(focus_js)
             .await
-            .map_err(|e| DriverError::BrowserCapabilityBroken(format!("Failed to focus selector: {}", e)))?
+            .map_err(|e| {
+                DriverError::BrowserCapabilityBroken(format!("Failed to focus selector: {}", e))
+            })?
             .into_value()
             .unwrap_or(false);
 
@@ -302,7 +308,12 @@ impl HumanBehaviorEngine {
         let clicked: bool = page
             .evaluate(click_js)
             .await
-            .map_err(|e| DriverError::BrowserCapabilityBroken(format!("Failed to click ref {}: {}", ref_id, e)))?
+            .map_err(|e| {
+                DriverError::BrowserCapabilityBroken(format!(
+                    "Failed to click ref {}: {}",
+                    ref_id, e
+                ))
+            })?
             .into_value()
             .unwrap_or(false);
 
@@ -318,7 +329,11 @@ impl HumanBehaviorEngine {
     }
 
     /// Smooth stepped scrolling with deceleration physics and frame jitter
-    pub async fn scroll_like_human(page: &Page, total_pixels: i32, steps: usize) -> Result<(), DriverError> {
+    pub async fn scroll_like_human(
+        page: &Page,
+        total_pixels: i32,
+        steps: usize,
+    ) -> Result<(), DriverError> {
         if steps == 0 {
             return Ok(());
         }
@@ -347,12 +362,20 @@ impl HumanBehaviorEngine {
         let raw_json: String = page
             .evaluate(SEMANTIC_SNAPSHOT_JS)
             .await
-            .map_err(|e| DriverError::BrowserCapabilityBroken(format!("Failed to extract semantic snapshot: {}", e)))?
+            .map_err(|e| {
+                DriverError::BrowserCapabilityBroken(format!(
+                    "Failed to extract semantic snapshot: {}",
+                    e
+                ))
+            })?
             .into_value()
             .unwrap_or_else(|_| "{}".to_string());
 
         let snapshot: SemanticSnapshot = serde_json::from_str(&raw_json).map_err(|e| {
-            DriverError::BrowserCapabilityBroken(format!("Failed to parse semantic snapshot JSON: {}", e))
+            DriverError::BrowserCapabilityBroken(format!(
+                "Failed to parse semantic snapshot JSON: {}",
+                e
+            ))
         })?;
 
         Ok(snapshot)
@@ -457,9 +480,8 @@ impl BrowserDriver {
             DriverError::Internal("No CredentialStore configured on BrowserDriver".to_string())
         })?;
 
-        let json = serde_json::to_string(jar).map_err(|e| {
-            DriverError::Internal(format!("Failed to serialize cookie jar: {}", e))
-        })?;
+        let json = serde_json::to_string(jar)
+            .map_err(|e| DriverError::Internal(format!("Failed to serialize cookie jar: {}", e)))?;
 
         store
             .set_secret(
@@ -511,13 +533,12 @@ impl BrowserDriver {
                     raw.to_string()
                 };
 
-                let jar: SessionCookieJar =
-                    serde_json::from_str(&decoded_str).map_err(|e| {
-                        DriverError::Internal(format!(
-                            "Failed to parse session cookies from Keychain: {}",
-                            e
-                        ))
-                    })?;
+                let jar: SessionCookieJar = serde_json::from_str(&decoded_str).map_err(|e| {
+                    DriverError::Internal(format!(
+                        "Failed to parse session cookies from Keychain: {}",
+                        e
+                    ))
+                })?;
                 Ok(Some(jar))
             }
             Err(_) => Ok(None),
@@ -719,7 +740,10 @@ impl BrowserDriver {
 
         self.apply_stealth_engine(&page).await?;
 
-        let injected = self.inject_keychain_cookies(&page, alias).await.unwrap_or(0);
+        let injected = self
+            .inject_keychain_cookies(&page, alias)
+            .await
+            .unwrap_or(0);
         if injected > 0 {
             info!(
                 "Pre-injected {} existing Keychain cookies for '{}'",
@@ -768,8 +792,7 @@ impl BrowserDriver {
                     }
                 }
 
-                if current_url == "https://www.reddit.com/"
-                    || current_url.contains("reddit.com/r/")
+                if current_url == "https://www.reddit.com/" || current_url.contains("reddit.com/r/")
                 {
                     verified_user =
                         verified_user.or_else(|| account_ctx.account.reddit_username.clone());
@@ -809,7 +832,9 @@ impl BrowserDriver {
             let _ = storage.update_reddit_username(&account_ctx.account.id, &verified_username);
         }
 
-        let initial_snapshot = HumanBehaviorEngine::take_semantic_snapshot(&page).await.ok();
+        let initial_snapshot = HumanBehaviorEngine::take_semantic_snapshot(&page)
+            .await
+            .ok();
 
         info!(
             "Account takeover verified for '{}' (u/{}), captured {} cookies (keychain={})",
@@ -1064,7 +1089,10 @@ mod tests {
         driver.save_cookies_to_keychain("my_acc", &jar).unwrap();
 
         // Load
-        let loaded = driver.load_cookies_from_keychain("my_acc").unwrap().unwrap();
+        let loaded = driver
+            .load_cookies_from_keychain("my_acc")
+            .unwrap()
+            .unwrap();
         assert_eq!(loaded.alias, "my_acc");
         assert_eq!(loaded.reddit_username.as_deref(), Some("reddit_dev"));
         assert_eq!(loaded.cookies.len(), 1);

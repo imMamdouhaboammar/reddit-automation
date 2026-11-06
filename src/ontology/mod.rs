@@ -99,15 +99,23 @@ mod tests {
         };
 
         let context = ProductContext::default();
-        let verdict = PreflightAnswerabilityGate::check_engagable(&spam_thread, &ontology, &context);
+        let verdict =
+            PreflightAnswerabilityGate::check_engagable(&spam_thread, &ontology, &context);
 
         match verdict {
-            EngagementVerdict::HighRiskViolation { rule_name, detected_phrase, severity } => {
+            EngagementVerdict::HighRiskViolation {
+                rule_name,
+                detected_phrase,
+                severity,
+            } => {
                 assert_eq!(rule_name, "AntiSpamAndVoteManipulation");
                 assert_eq!(detected_phrase, "upvote for upvote");
                 assert_eq!(severity, RuleSeverity::StrictBan);
             }
-            _ => panic!("Expected HighRiskViolation for spam thread, got {:?}", verdict),
+            _ => panic!(
+                "Expected HighRiskViolation for spam thread, got {:?}",
+                verdict
+            ),
         }
     }
 
@@ -143,12 +151,19 @@ mod tests {
         let context = ProductContext::default();
 
         // 1. Without certified angle -> UncertifiedAngleRequired
-        let verdict_uncertified = PreflightAnswerabilityGate::check_engagable(&thread, &ontology, &context);
+        let verdict_uncertified =
+            PreflightAnswerabilityGate::check_engagable(&thread, &ontology, &context);
         match verdict_uncertified {
-            EngagementVerdict::UncertifiedAngleRequired { detected_pain_point, .. } => {
+            EngagementVerdict::UncertifiedAngleRequired {
+                detected_pain_point,
+                ..
+            } => {
                 assert_eq!(detected_pain_point, "wasting hours");
             }
-            _ => panic!("Expected UncertifiedAngleRequired, got {:?}", verdict_uncertified),
+            _ => panic!(
+                "Expected UncertifiedAngleRequired, got {:?}",
+                verdict_uncertified
+            ),
         }
 
         // 2. Add human-certified angle -> CertifiedSafe
@@ -161,9 +176,14 @@ mod tests {
             "qa_reviewer",
         );
 
-        let verdict_certified = PreflightAnswerabilityGate::check_engagable(&thread, &ontology, &context);
+        let verdict_certified =
+            PreflightAnswerabilityGate::check_engagable(&thread, &ontology, &context);
         match verdict_certified {
-            EngagementVerdict::CertifiedSafe { angle, matched_terms, alignment_score } => {
+            EngagementVerdict::CertifiedSafe {
+                angle,
+                matched_terms,
+                alignment_score,
+            } => {
                 assert_eq!(angle.target_pain_point, "wasting hours");
                 assert!(matched_terms.contains(&"wasting hours".to_string()));
                 assert!(alignment_score > 0.4);

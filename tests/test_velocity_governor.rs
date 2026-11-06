@@ -7,7 +7,10 @@ fn test_velocity_governor_enforces_sleep_and_daily_cap() {
 
     // 1. Simulate 03:00 AM local time (Sleep mode between 23:00 and 07:00)
     let late_night = NaiveTime::from_hms_opt(3, 0, 0).unwrap();
-    assert_eq!(gov.evaluate_time(late_night), InteractionVerdict::SleepWindow);
+    assert_eq!(
+        gov.evaluate_time(late_night),
+        InteractionVerdict::SleepWindow
+    );
 
     // 2. Simulate 14:00 PM local time (Active hours)
     let daytime = NaiveTime::from_hms_opt(14, 0, 0).unwrap();

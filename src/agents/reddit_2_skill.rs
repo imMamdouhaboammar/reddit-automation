@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use tracing::info;
 
 use crate::agents::opportunity::RedditThread;
@@ -44,17 +44,36 @@ impl Reddit2SkillEngine {
         let lower = topic.to_lowercase();
         let mut subs = Vec::new();
 
-        if lower.contains("vibe") || lower.contains("ai code") || lower.contains("cursor") || lower.contains("copilot") {
+        if lower.contains("vibe")
+            || lower.contains("ai code")
+            || lower.contains("cursor")
+            || lower.contains("copilot")
+        {
             subs.extend_from_slice(&["vibecoding", "ChatGPTCoding", "webdev", "programming"]);
-        } else if lower.contains("shopify") || lower.contains("ecommerce") || lower.contains("store") {
+        } else if lower.contains("shopify")
+            || lower.contains("ecommerce")
+            || lower.contains("store")
+        {
             subs.extend_from_slice(&["shopify", "ecommerce", "dropship", "webdev"]);
-        } else if lower.contains("marketing") || lower.contains("growth") || lower.contains("lead") || lower.contains("customer") {
+        } else if lower.contains("marketing")
+            || lower.contains("growth")
+            || lower.contains("lead")
+            || lower.contains("customer")
+        {
             subs.extend_from_slice(&["SaaS", "Entrepreneur", "marketing", "indiehackers"]);
-        } else if lower.contains("fastapi") || lower.contains("python") || lower.contains("backend") {
+        } else if lower.contains("fastapi") || lower.contains("python") || lower.contains("backend")
+        {
             subs.extend_from_slice(&["FastAPI", "Python", "webdev"]);
-        } else if lower.contains("react") || lower.contains("frontend") || lower.contains("next") || lower.contains("css") {
+        } else if lower.contains("react")
+            || lower.contains("frontend")
+            || lower.contains("next")
+            || lower.contains("css")
+        {
             subs.extend_from_slice(&["reactjs", "nextjs", "webdev", "frontend"]);
-        } else if lower.contains("rust") || lower.contains("systems") || lower.contains("performance") {
+        } else if lower.contains("rust")
+            || lower.contains("systems")
+            || lower.contains("performance")
+        {
             subs.extend_from_slice(&["rust", "programming", "systems"]);
         } else {
             subs.extend_from_slice(&["SaaS", "webdev", "programming", "technology"]);
@@ -71,7 +90,11 @@ impl Reddit2SkillEngine {
             .map(|c| if c.is_alphanumeric() { c } else { '-' })
             .collect();
         let trimmed = clean.trim_matches('-');
-        let parts: Vec<&str> = trimmed.split('-').filter(|p| !p.is_empty()).take(4).collect();
+        let parts: Vec<&str> = trimmed
+            .split('-')
+            .filter(|p| !p.is_empty())
+            .take(4)
+            .collect();
         if parts.is_empty() {
             "reddit-mined-skill".to_string()
         } else {
@@ -108,7 +131,10 @@ impl Reddit2SkillEngine {
             .await;
 
         let thread_count = threads.len();
-        info!(threads_found = thread_count, "Crawled Reddit threads for skill synthesis");
+        info!(
+            threads_found = thread_count,
+            "Crawled Reddit threads for skill synthesis"
+        );
 
         // Synthesize OmniSkill artifacts
         let skill_package = self.synthesize_skill(&skill_id, topic, &subreddits, &threads)?;
@@ -130,7 +156,10 @@ impl Reddit2SkillEngine {
         subreddits: &[String],
         threads: &[RedditThread],
     ) -> Result<GeneratedSkillPackage, String> {
-        let display_name = format!("🛡️ {} Operator (Reddit-Synthesized)", skill_id.replace('-', " "));
+        let display_name = format!(
+            "🛡️ {} Operator (Reddit-Synthesized)",
+            skill_id.replace('-', " ")
+        );
         let sub_list = subreddits.join(", r/");
 
         // 1. Build SKILL.md
@@ -148,7 +177,10 @@ impl Reddit2SkillEngine {
             "  Addresses real-world failure modes, undocumented traps, and battle-tested solutions\n  for '{}' adhering to OmniSkill v6.2.0 and Poteto Mode standards.\n",
             topic
         ));
-        skill_md.push_str(&format!("argument-hint: '{} audit | {} execute'\n", skill_id, skill_id));
+        skill_md.push_str(&format!(
+            "argument-hint: '{} audit | {} execute'\n",
+            skill_id, skill_id
+        ));
         skill_md.push_str("allowed-tools: Bash, Read, Write\n");
         skill_md.push_str("metadata:\n");
         skill_md.push_str("  openclaw:\n");
@@ -172,11 +204,15 @@ impl Reddit2SkillEngine {
 
         skill_md.push_str("## 4-Step Operational Loop\n\n");
         skill_md.push_str("### Step 1: Preflight & Context Discovery\n");
-        skill_md.push_str("- Inspect current environment, dependencies, and configuration states.\n");
-        skill_md.push_str("- Execute `scripts/preflight_check.py` to identify silent regressions.\n\n");
+        skill_md
+            .push_str("- Inspect current environment, dependencies, and configuration states.\n");
+        skill_md
+            .push_str("- Execute `scripts/preflight_check.py` to identify silent regressions.\n\n");
 
         skill_md.push_str("### Step 2: Anti-Pattern Detection\n");
-        skill_md.push_str("- Check against known failure modes documented in `references/reddit_evidence.md`.\n");
+        skill_md.push_str(
+            "- Check against known failure modes documented in `references/reddit_evidence.md`.\n",
+        );
         skill_md.push_str("- Flag and block recursive trial-and-error edits.\n\n");
 
         skill_md.push_str("### Step 3: Targeted Remediation\n");
@@ -189,16 +225,19 @@ impl Reddit2SkillEngine {
 
         // Extract community ontology domain graph for grounding
         let primary_sub = subreddits.first().map(|s| s.as_str()).unwrap_or("reddit");
-        let ontology = crate::ontology::AutoOntologyBuilder::build_from_threads(
-            primary_sub,
-            topic,
-            threads,
-        );
+        let ontology =
+            crate::ontology::AutoOntologyBuilder::build_from_threads(primary_sub, topic, threads);
 
         skill_md.push_str("## Community Domain Ontology & Taboo Boundaries\n\n");
-        skill_md.push_str(&format!("*Extracted semantic boundaries for r/{}:*\n\n", primary_sub));
+        skill_md.push_str(&format!(
+            "*Extracted semantic boundaries for r/{}:*\n\n",
+            primary_sub
+        ));
         for rule in &ontology.rules {
-            skill_md.push_str(&format!("- **Rule: {}** ({:?}): {}\n", rule.rule_name, rule.severity, rule.description));
+            skill_md.push_str(&format!(
+                "- **Rule: {}** ({:?}): {}\n",
+                rule.rule_name, rule.severity, rule.description
+            ));
         }
         if !ontology.terms.is_empty() {
             skill_md.push_str("\n### Verified Practitioner Concepts\n");
@@ -206,11 +245,14 @@ impl Reddit2SkillEngine {
                 skill_md.push_str(&format!("- `{}` ({:?})\n", term.term, term.category));
             }
         }
-        skill_md.push_str("\n");
+        skill_md.push('\n');
 
         // 2. Build references/reddit_evidence.md
         let mut evidence_md = String::new();
-        evidence_md.push_str(&format!("# Reddit Empirical Evidence Dossier: {}\n\n", topic));
+        evidence_md.push_str(&format!(
+            "# Reddit Empirical Evidence Dossier: {}\n\n",
+            topic
+        ));
         evidence_md.push_str(&format!("*Mined across communities: r/{}*\n\n", sub_list));
         evidence_md.push_str("## Analyzed High-Signal Threads\n\n");
         evidence_md.push_str("| # | Title | Subreddit | Comments | Direct Thread URL |\n");
@@ -236,7 +278,10 @@ impl Reddit2SkillEngine {
         if !ontology.relationships.is_empty() {
             evidence_md.push_str("\n## Discovered Problem-Solution Semantic Graph\n\n");
             for rel in ontology.relationships.iter().take(10) {
-                evidence_md.push_str(&format!("- `{}` --[{:?}]--> `{}` (confidence: {:.2})\n", rel.from_term, rel.relation, rel.to_term, rel.confidence));
+                evidence_md.push_str(&format!(
+                    "- `{}` --[{:?}]--> `{}` (confidence: {:.2})\n",
+                    rel.from_term, rel.relation, rel.to_term, rel.confidence
+                ));
             }
         }
 
@@ -269,7 +314,8 @@ def run_preflight():
 
 if __name__ == "__main__":
     run_preflight()
-"#.to_string();
+"#
+        .to_string();
 
         Ok(GeneratedSkillPackage {
             skill_name: skill_id.to_string(),
@@ -301,7 +347,10 @@ if __name__ == "__main__":
         std::fs::write(skill_dir.join("SKILL.md"), &package.skill_md_content)?;
 
         // Write references/reddit_evidence.md
-        std::fs::write(references_dir.join("reddit_evidence.md"), &package.evidence_md_content)?;
+        std::fs::write(
+            references_dir.join("reddit_evidence.md"),
+            &package.evidence_md_content,
+        )?;
 
         // Write scripts/preflight_check.py
         let script_path = scripts_dir.join("preflight_check.py");
@@ -351,29 +400,34 @@ mod tests {
     #[test]
     fn test_synthesize_skill_structure() {
         let engine = Reddit2SkillEngine::new();
-        let threads = vec![
-            RedditThread {
-                id: "101".to_string(),
-                subreddit: "vibecoding".to_string(),
-                title: "Fix the bug trap is real".to_string(),
-                body: "Cascading failures".to_string(),
-                author: "alice".to_string(),
-                created_utc: 1700000000,
-                num_comments: 25,
-                is_locked: false,
-                is_archived: false,
-                url: "https://reddit.com/r/vibecoding/comments/101/".to_string(),
-            }
-        ];
+        let threads = vec![RedditThread {
+            id: "101".to_string(),
+            subreddit: "vibecoding".to_string(),
+            title: "Fix the bug trap is real".to_string(),
+            body: "Cascading failures".to_string(),
+            author: "alice".to_string(),
+            created_utc: 1700000000,
+            num_comments: 25,
+            is_locked: false,
+            is_archived: false,
+            url: "https://reddit.com/r/vibecoding/comments/101/".to_string(),
+        }];
 
         let package = engine
-            .synthesize_skill("vibe-defense", "vibe coding defense", &["vibecoding".to_string()], &threads)
+            .synthesize_skill(
+                "vibe-defense",
+                "vibe coding defense",
+                &["vibecoding".to_string()],
+                &threads,
+            )
             .unwrap();
 
         assert_eq!(package.skill_name, "vibe-defense");
         assert!(package.skill_md_content.contains("name: vibe-defense"));
         assert!(package.skill_md_content.contains("Core Invariants"));
-        assert!(package.evidence_md_content.contains("Fix the bug trap is real"));
+        assert!(package
+            .evidence_md_content
+            .contains("Fix the bug trap is real"));
         assert!(package.script_content.contains("run_preflight"));
     }
 }

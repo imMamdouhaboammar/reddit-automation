@@ -60,7 +60,9 @@ pub struct DynamicRouter;
 impl DynamicRouter {
     /// Detects language (Arabic, English, or mixed).
     pub fn detect_language(prompt: &str) -> String {
-        let has_arabic = prompt.chars().any(|c| ('\u{0600}'..='\u{06FF}').contains(&c));
+        let has_arabic = prompt
+            .chars()
+            .any(|c| ('\u{0600}'..='\u{06FF}').contains(&c));
         if has_arabic {
             "ar".to_string()
         } else {
@@ -162,7 +164,10 @@ impl DynamicRouter {
     }
 
     /// Constructs an execution DAG for a user prompt.
-    pub fn build_execution_dag(prompt: &str, target_context: Option<serde_json::Value>) -> ExecutionDag {
+    pub fn build_execution_dag(
+        prompt: &str,
+        target_context: Option<serde_json::Value>,
+    ) -> ExecutionDag {
         let lang = Self::detect_language(prompt);
         let (intent, confidence) = Self::classify_intent(prompt);
 
@@ -173,7 +178,11 @@ impl DynamicRouter {
             .to_string();
         let subreddits = context["subreddits"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect::<Vec<_>>()
+            })
             .unwrap_or_else(|| vec!["SaaS".to_string(), "startups".to_string()]);
 
         let mut steps = Vec::new();
@@ -187,7 +196,9 @@ impl DynamicRouter {
                     step_id: "step_dig_sources".to_string(),
                     agent_role: "DiggerAgent".to_string(),
                     tool_name: "reddit_digger".to_string(),
-                    description: "Determine candidate subreddits and deeply aggregate source threads".to_string(),
+                    description:
+                        "Determine candidate subreddits and deeply aggregate source threads"
+                            .to_string(),
                     dependencies: vec![],
                     requires_human_approval: false,
                     parameters: serde_json::json!({
@@ -232,7 +243,9 @@ impl DynamicRouter {
                     step_id: "step_draft_response".to_string(),
                     agent_role: "DrafterAgent".to_string(),
                     tool_name: "reddit_draft_response".to_string(),
-                    description: "Formulate 25-55 word Experience Grammar reply with mandatory disclosure".to_string(),
+                    description:
+                        "Formulate 25-55 word Experience Grammar reply with mandatory disclosure"
+                            .to_string(),
                     dependencies: vec!["step_mine_content".to_string()],
                     requires_human_approval: false,
                     parameters: serde_json::json!({}),
@@ -243,7 +256,10 @@ impl DynamicRouter {
                 });
 
                 safety_notes.push("Multi-tier keyless scraping preserves anonymity.".to_string());
-                safety_notes.push("Replies strictly enforced within 25-55 words with anti-slop rules.".to_string());
+                safety_notes.push(
+                    "Replies strictly enforced within 25-55 words with anti-slop rules."
+                        .to_string(),
+                );
             }
 
             IntentCategory::SkillSynthesis => {
@@ -251,7 +267,8 @@ impl DynamicRouter {
                     step_id: "step_synthesize_skill".to_string(),
                     agent_role: "SkillSynthesizerAgent".to_string(),
                     tool_name: "reddit_2_skill".to_string(),
-                    description: "Mine deep community consensus and forge OmniSkill v6.2.0 package".to_string(),
+                    description: "Mine deep community consensus and forge OmniSkill v6.2.0 package"
+                        .to_string(),
                     dependencies: vec![],
                     requires_human_approval: false,
                     parameters: serde_json::json!({
@@ -263,7 +280,9 @@ impl DynamicRouter {
                     wave_index: 0,
                     step_ids: vec!["step_synthesize_skill".to_string()],
                 });
-                safety_notes.push("Generated skill follows AgentSkills.io v1 & Poteto principles.".to_string());
+                safety_notes.push(
+                    "Generated skill follows AgentSkills.io v1 & Poteto principles.".to_string(),
+                );
             }
 
             IntentCategory::ContentPublishing => {
@@ -272,7 +291,9 @@ impl DynamicRouter {
                     step_id: "step_prepare_action".to_string(),
                     agent_role: "PlannerAgent".to_string(),
                     tool_name: "reddit_prepare_comment".to_string(),
-                    description: "Validate content and calculate cryptographic SHA-256 ActionPlan hash".to_string(),
+                    description:
+                        "Validate content and calculate cryptographic SHA-256 ActionPlan hash"
+                            .to_string(),
                     dependencies: vec![],
                     requires_human_approval: false,
                     parameters: serde_json::json!({
@@ -305,7 +326,8 @@ impl DynamicRouter {
                     step_id: "step_publish_action".to_string(),
                     agent_role: "PublisherAgent".to_string(),
                     tool_name: "reddit_publish_prepared_comment".to_string(),
-                    description: "Publish verified payload through authenticated driver".to_string(),
+                    description: "Publish verified payload through authenticated driver"
+                        .to_string(),
                     dependencies: vec!["step_approve_action".to_string()],
                     requires_human_approval: false,
                     parameters: serde_json::json!({}),
@@ -315,7 +337,10 @@ impl DynamicRouter {
                     step_ids: vec!["step_publish_action".to_string()],
                 });
 
-                safety_notes.push("Fail-closed invariant: unapproved actions cannot mutate Reddit state.".to_string());
+                safety_notes.push(
+                    "Fail-closed invariant: unapproved actions cannot mutate Reddit state."
+                        .to_string(),
+                );
             }
 
             IntentCategory::AccountGovernance => {
@@ -323,7 +348,8 @@ impl DynamicRouter {
                     step_id: "step_audit_ratio".to_string(),
                     agent_role: "AuditorAgent".to_string(),
                     tool_name: "reddit_audit_community_ratio".to_string(),
-                    description: "Evaluate 90/10 content-to-promo participation balance".to_string(),
+                    description: "Evaluate 90/10 content-to-promo participation balance"
+                        .to_string(),
                     dependencies: vec![],
                     requires_human_approval: false,
                     parameters: serde_json::json!({}),
@@ -339,7 +365,10 @@ impl DynamicRouter {
                 });
                 waves.push(DagWave {
                     wave_index: 0,
-                    step_ids: vec!["step_audit_ratio".to_string(), "step_account_health".to_string()],
+                    step_ids: vec![
+                        "step_audit_ratio".to_string(),
+                        "step_account_health".to_string(),
+                    ],
                 });
                 safety_notes.push("Non-destructive read-only governance checks.".to_string());
             }
@@ -349,7 +378,8 @@ impl DynamicRouter {
                     step_id: "step_diagnose".to_string(),
                     agent_role: "DiagnosticianAgent".to_string(),
                     tool_name: "reddit_diagnose_issue".to_string(),
-                    description: "Isolate root cause from API error or rejection payload".to_string(),
+                    description: "Isolate root cause from API error or rejection payload"
+                        .to_string(),
                     dependencies: vec![],
                     requires_human_approval: false,
                     parameters: serde_json::json!({
@@ -415,15 +445,18 @@ mod tests {
 
     #[test]
     fn test_classify_intent_english_and_arabic() {
-        let (intent_en, conf_en) = DynamicRouter::classify_intent("Find SaaS opportunities on Reddit");
+        let (intent_en, conf_en) =
+            DynamicRouter::classify_intent("Find SaaS opportunities on Reddit");
         assert_eq!(intent_en, IntentCategory::OpportunityHunting);
         assert!(conf_en >= 0.90);
 
-        let (intent_ar, conf_ar) = DynamicRouter::classify_intent("ابحث عن فرص تسويقية للشركات الناشئة");
+        let (intent_ar, conf_ar) =
+            DynamicRouter::classify_intent("ابحث عن فرص تسويقية للشركات الناشئة");
         assert_eq!(intent_ar, IntentCategory::OpportunityHunting);
         assert!(conf_ar >= 0.90);
 
-        let (intent_skill, _) = DynamicRouter::classify_intent("صمم مهارة للتعامل مع أخطاء الـ vibe coding");
+        let (intent_skill, _) =
+            DynamicRouter::classify_intent("صمم مهارة للتعامل مع أخطاء الـ vibe coding");
         assert_eq!(intent_skill, IntentCategory::SkillSynthesis);
 
         let (intent_diag, _) = DynamicRouter::classify_intent("شخص لي سبب حظر الحساب أو الخطأ");

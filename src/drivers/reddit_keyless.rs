@@ -1,7 +1,7 @@
-use std::collections::HashSet;
-use std::time::Duration;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, USER_AGENT};
 use serde_json::Value;
+use std::collections::HashSet;
+use std::time::Duration;
 use tracing::{debug, warn};
 
 use crate::agents::opportunity::RedditThread;
@@ -9,12 +9,59 @@ use crate::drivers::DriverError;
 
 /// Noise words to ignore during relevance scoring (matching last30days-skill catalog).
 pub const NOISE_WORDS: &[&str] = &[
-    "best", "top", "good", "great", "awesome", "killer", "latest", "new", "news", "update",
-    "updates", "trending", "hottest", "popular", "practices", "features", "tips",
-    "recommendations", "advice", "prompt", "prompts", "prompting", "methods", "strategies",
-    "approaches", "how", "to", "the", "a", "an", "for", "with", "of", "in", "on", "is", "are",
-    "what", "which", "guide", "tutorial", "using", "and", "or", "i", "my", "we", "our", "you",
-    "your", "it", "this", "that",
+    "best",
+    "top",
+    "good",
+    "great",
+    "awesome",
+    "killer",
+    "latest",
+    "new",
+    "news",
+    "update",
+    "updates",
+    "trending",
+    "hottest",
+    "popular",
+    "practices",
+    "features",
+    "tips",
+    "recommendations",
+    "advice",
+    "prompt",
+    "prompts",
+    "prompting",
+    "methods",
+    "strategies",
+    "approaches",
+    "how",
+    "to",
+    "the",
+    "a",
+    "an",
+    "for",
+    "with",
+    "of",
+    "in",
+    "on",
+    "is",
+    "are",
+    "what",
+    "which",
+    "guide",
+    "tutorial",
+    "using",
+    "and",
+    "or",
+    "i",
+    "my",
+    "we",
+    "our",
+    "you",
+    "your",
+    "it",
+    "this",
+    "that",
 ];
 
 /// Keyless Reddit Driver inspired by the last30days-skill multi-tier discovery pipeline.
@@ -60,10 +107,7 @@ impl RedditKeylessDriver {
             ACCEPT,
             HeaderValue::from_static("application/json, text/plain, */*"),
         );
-        headers.insert(
-            ACCEPT_LANGUAGE,
-            HeaderValue::from_static("en-US,en;q=0.9"),
-        );
+        headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en-US,en;q=0.9"));
         headers
     }
 
@@ -82,7 +126,9 @@ impl RedditKeylessDriver {
 
         let url = format!(
             "https://www.reddit.com/r/{}/{}.json?limit={}",
-            clean_sub, valid_sort, limit.min(100)
+            clean_sub,
+            valid_sort,
+            limit.min(100)
         );
 
         debug!(url = %url, "Fetching keyless reddit listing");
@@ -176,7 +222,10 @@ impl RedditKeylessDriver {
 
         // Tier 1: Public listings across target subreddits
         for sub in subreddits {
-            match self.fetch_subreddit_listing(sub, "hot", limit_per_sub).await {
+            match self
+                .fetch_subreddit_listing(sub, "hot", limit_per_sub)
+                .await
+            {
                 Ok(posts) => {
                     for post in posts {
                         if seen_ids.insert(post.id.clone()) {
@@ -188,7 +237,10 @@ impl RedditKeylessDriver {
                     warn!(subreddit = %sub, error = %err, "Public listing failed, attempting Arctic Shift fallback");
                     // Fallback to Arctic Shift for this subreddit
                     for phrase in search_phrases.iter().take(2) {
-                        if let Ok(posts) = self.fetch_arctic_archive(phrase, Some(sub), limit_per_sub).await {
+                        if let Ok(posts) = self
+                            .fetch_arctic_archive(phrase, Some(sub), limit_per_sub)
+                            .await
+                        {
                             for post in posts {
                                 if seen_ids.insert(post.id.clone()) {
                                     collected.push(post);
@@ -371,7 +423,11 @@ mod tests {
         ];
 
         let relevance = RedditKeylessDriver::calculate_relevance(title, body, &targets);
-        assert!(relevance > 0.6, "Relevance should match 2 out of 3 targets, got {}", relevance);
+        assert!(
+            relevance > 0.6,
+            "Relevance should match 2 out of 3 targets, got {}",
+            relevance
+        );
     }
 
     #[test]
@@ -380,7 +436,8 @@ mod tests {
         let viral_off_topic_relevance = 0.10;
 
         let on_topic_score = RedditKeylessDriver::rank_composite_score(on_topic_relevance, 5, 10);
-        let viral_score = RedditKeylessDriver::rank_composite_score(viral_off_topic_relevance, 5000, 20000);
+        let viral_score =
+            RedditKeylessDriver::rank_composite_score(viral_off_topic_relevance, 5000, 20000);
 
         // Even with 25,000 engagement, viral post cannot overcome 0.25 bonus cap
         assert!(

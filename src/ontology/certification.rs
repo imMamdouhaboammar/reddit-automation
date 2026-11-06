@@ -38,7 +38,11 @@ impl CertificationManager {
         angle_id: &str,
         certified_by: &str,
     ) -> Result<CertifiedAngle, String> {
-        if let Some(angle) = ontology.certified_angles.iter_mut().find(|a| a.id == angle_id) {
+        if let Some(angle) = ontology
+            .certified_angles
+            .iter_mut()
+            .find(|a| a.id == angle_id)
+        {
             angle.active = true;
             angle.certified_by = certified_by.to_string();
             angle.certified_at = chrono::Utc::now().to_rfc3339();
@@ -54,7 +58,11 @@ impl CertificationManager {
         ontology: &mut CommunityOntology,
         angle_id: &str,
     ) -> Result<CertifiedAngle, String> {
-        if let Some(angle) = ontology.certified_angles.iter_mut().find(|a| a.id == angle_id) {
+        if let Some(angle) = ontology
+            .certified_angles
+            .iter_mut()
+            .find(|a| a.id == angle_id)
+        {
             angle.active = false;
             ontology.updated_at = chrono::Utc::now().to_rfc3339();
             Ok(angle.clone())

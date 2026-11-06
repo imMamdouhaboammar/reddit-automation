@@ -812,7 +812,8 @@ impl Storage {
 
     pub fn list_community_ontologies(&self) -> Result<Vec<String>, StorageError> {
         let conn = self.conn.lock().map_err(|_| StorageError::LockError)?;
-        let mut stmt = conn.prepare("SELECT subreddit FROM community_ontologies ORDER BY subreddit ASC")?;
+        let mut stmt =
+            conn.prepare("SELECT subreddit FROM community_ontologies ORDER BY subreddit ASC")?;
         let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
         let mut subs = Vec::new();
         for r in rows {
@@ -951,7 +952,8 @@ mod tests {
     #[test]
     fn test_storage_community_ontology_persistence() {
         let storage = Storage::new_in_memory().expect("in-memory db");
-        let mut ontology = crate::ontology::CommunityOntology::new("vibecoding", "Vibe Coding discussions");
+        let mut ontology =
+            crate::ontology::CommunityOntology::new("vibecoding", "Vibe Coding discussions");
         ontology.terms.push(crate::ontology::CommunityTerm {
             id: "term_1".to_string(),
             term: "spec-driven".to_string(),
@@ -963,9 +965,14 @@ mod tests {
             certified: true,
         });
 
-        storage.save_community_ontology(&ontology).expect("save ontology");
+        storage
+            .save_community_ontology(&ontology)
+            .expect("save ontology");
 
-        let loaded = storage.get_community_ontology("vibecoding").expect("get ontology").expect("found");
+        let loaded = storage
+            .get_community_ontology("vibecoding")
+            .expect("get ontology")
+            .expect("found");
         assert_eq!(loaded.subreddit, "vibecoding");
         assert_eq!(loaded.terms.len(), 1);
         assert_eq!(loaded.terms[0].term, "spec-driven");
@@ -984,8 +991,12 @@ mod tests {
             active: true,
         };
 
-        storage.save_certified_angle("vibecoding", &angle).expect("save angle");
-        let angles = storage.get_certified_angles("vibecoding").expect("get angles");
+        storage
+            .save_certified_angle("vibecoding", &angle)
+            .expect("save angle");
+        let angles = storage
+            .get_certified_angles("vibecoding")
+            .expect("get angles");
         assert_eq!(angles.len(), 1);
         assert_eq!(angles[0].title, "Zero-Shot Engineering");
     }

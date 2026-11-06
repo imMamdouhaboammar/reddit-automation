@@ -642,9 +642,7 @@ impl Driver for RedditApiDriver {
                 Err(DriverError::Unsupported(Capability::BrowserSettings))
             }
 
-            Capability::KeylessSearch => {
-                Err(DriverError::Unsupported(Capability::KeylessSearch))
-            }
+            Capability::KeylessSearch => Err(DriverError::Unsupported(Capability::KeylessSearch)),
 
             Capability::DiscoverOpportunities => {
                 Err(DriverError::Unsupported(Capability::DiscoverOpportunities))

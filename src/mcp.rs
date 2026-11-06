@@ -7,7 +7,9 @@ use tracing::info;
 use crate::accounts::AccountManager;
 use crate::actions::{ActionManager, RiskLevel};
 use crate::agents::community_builder::CommunityBuilderWorker;
-use crate::agents::opportunity::{DiggerSource, OpportunityWorker, ProductContext, RankedOpportunity};
+use crate::agents::opportunity::{
+    DiggerSource, OpportunityWorker, ProductContext, RankedOpportunity,
+};
 use crate::drivers::reddit_keyless::RedditKeylessDriver;
 use crate::drivers::Capability;
 use crate::issues::IssueEngine;
@@ -548,7 +550,8 @@ impl McpServer {
                 .ok_or_else(|| "Missing required 'prompt' argument".to_string())?;
 
             let context_opt = args.get("context").cloned();
-            let dag = crate::agents::router::DynamicRouter::build_execution_dag(prompt, context_opt);
+            let dag =
+                crate::agents::router::DynamicRouter::build_execution_dag(prompt, context_opt);
             return Ok(json!(dag));
         }
 
@@ -562,7 +565,9 @@ impl McpServer {
                 .and_then(|p| serde_json::from_value(p.clone()).ok());
 
             let orchestrator = crate::agents::orchestrator::MasterOrchestrator::new();
-            let report = orchestrator.orchestrate_from_prompt(prompt, product).await?;
+            let report = orchestrator
+                .orchestrate_from_prompt(prompt, product)
+                .await?;
             return Ok(json!(report));
         }
 
@@ -713,7 +718,8 @@ impl McpServer {
                 .discover_threads(&subreddits, &high_intent_phrases, limit_per_sub)
                 .await;
 
-            let digger_result = OpportunityWorker::dig_sources(&threads, &subreddits, &high_intent_phrases);
+            let digger_result =
+                OpportunityWorker::dig_sources(&threads, &subreddits, &high_intent_phrases);
             return Ok(json!(digger_result));
         }
 
@@ -735,7 +741,10 @@ impl McpServer {
         }
 
         if name == "reddit_discover_opportunities" {
-            let product_name = args["product_name"].as_str().unwrap_or("Product").to_string();
+            let product_name = args["product_name"]
+                .as_str()
+                .unwrap_or("Product")
+                .to_string();
             let value_prop = args["value_prop"].as_str().unwrap_or("").to_string();
             let icp_target = args["icp_target"].as_str().unwrap_or("").to_string();
             let affiliation_disclosure = args["affiliation_disclosure"]
@@ -797,9 +806,11 @@ impl McpServer {
                 .discover_threads(&subreddits, &high_intent_phrases, limit_per_sub)
                 .await;
 
-            let digger_result = OpportunityWorker::dig_sources(&threads, &subreddits, &high_intent_phrases);
+            let digger_result =
+                OpportunityWorker::dig_sources(&threads, &subreddits, &high_intent_phrases);
             let now_utc = chrono::Utc::now().timestamp();
-            let miner_result = OpportunityWorker::mine_content(&digger_result.sources, &product, now_utc);
+            let miner_result =
+                OpportunityWorker::mine_content(&digger_result.sources, &product, now_utc);
             return Ok(json!(miner_result.opportunities));
         }
 
@@ -880,9 +891,7 @@ impl McpServer {
             };
 
             let verdict = crate::ontology::PreflightAnswerabilityGate::check_engagable(
-                &thread,
-                &ontology,
-                &context,
+                &thread, &ontology, &context,
             );
 
             return Ok(json!(verdict));
@@ -972,9 +981,12 @@ impl McpServer {
                 let link_karma = identity["link_karma"].as_i64().unwrap_or(0);
                 let comment_karma = identity["comment_karma"].as_i64().unwrap_or(0);
 
-                let input_records: Vec<crate::agents::community_builder::EngagementRecord> = args["history"]
+                let input_records: Vec<crate::agents::community_builder::EngagementRecord> = args
+                    ["history"]
                     .as_array()
-                    .and_then(|arr| serde_json::from_value(serde_json::Value::Array(arr.clone())).ok())
+                    .and_then(|arr| {
+                        serde_json::from_value(serde_json::Value::Array(arr.clone())).ok()
+                    })
                     .unwrap_or_else(|| {
                         let value_count = (comment_karma.max(0) / 10).clamp(1, 90) as usize;
                         let promo_count = (link_karma.max(0) / 50).clamp(0, 10) as usize;
@@ -1508,9 +1520,15 @@ mod tests {
         // Verify newly added opportunity and community audit tools are present in tools list
         assert!(tools_arr.iter().any(|t| t["name"] == "reddit_digger"));
         assert!(tools_arr.iter().any(|t| t["name"] == "reddit_miner"));
-        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_discover_opportunities"));
-        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_draft_response"));
-        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_audit_community_ratio"));
+        assert!(tools_arr
+            .iter()
+            .any(|t| t["name"] == "reddit_discover_opportunities"));
+        assert!(tools_arr
+            .iter()
+            .any(|t| t["name"] == "reddit_draft_response"));
+        assert!(tools_arr
+            .iter()
+            .any(|t| t["name"] == "reddit_audit_community_ratio"));
 
         let sample_product = json!({
             "product_name": "RedditAgent",
@@ -1602,9 +1620,15 @@ mod tests {
         assert!(ratio_res["audit"]["is_compliant"].is_boolean());
 
         // Verify newly added stealth browser & keychain takeover tools are present
-        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_account_login"));
-        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_takeover_account"));
-        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_account_cookies"));
+        assert!(tools_arr
+            .iter()
+            .any(|t| t["name"] == "reddit_account_login"));
+        assert!(tools_arr
+            .iter()
+            .any(|t| t["name"] == "reddit_takeover_account"));
+        assert!(tools_arr
+            .iter()
+            .any(|t| t["name"] == "reddit_account_cookies"));
         assert!(tools_arr.iter().any(|t| t["name"] == "reddit_human_browse"));
 
         // Call reddit_account_cookies when empty
@@ -1616,9 +1640,8 @@ mod tests {
 
         // Populate keychain cookies and test again
         let store = server.account_manager.auth().credential_store();
-        let browser_driver = Arc::new(
-            crate::drivers::browser::BrowserDriver::new().with_credential_store(store),
-        );
+        let browser_driver =
+            Arc::new(crate::drivers::browser::BrowserDriver::new().with_credential_store(store));
         let sample_jar = crate::drivers::browser::SessionCookieJar {
             alias: "personal".to_string(),
             reddit_username: Some("my_user".to_string()),
@@ -1650,9 +1673,15 @@ mod tests {
 
         // Verify newly added auto-ontology tools
         assert!(tools_arr.iter().any(|t| t["name"] == "reddit_ontology_get"));
-        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_ontology_check_engagable"));
-        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_ontology_certify_angle"));
-        assert!(tools_arr.iter().any(|t| t["name"] == "reddit_ontology_list"));
+        assert!(tools_arr
+            .iter()
+            .any(|t| t["name"] == "reddit_ontology_check_engagable"));
+        assert!(tools_arr
+            .iter()
+            .any(|t| t["name"] == "reddit_ontology_certify_angle"));
+        assert!(tools_arr
+            .iter()
+            .any(|t| t["name"] == "reddit_ontology_list"));
 
         let server_with_storage = server_with_browser.with_storage(storage.clone());
 

@@ -66,8 +66,11 @@ impl CredentialStore for GcpSecretManagerStore {
 
         // 2. Check environment variable injected via Cloud Secret Manager
         let primary_env_key = Self::normalize_env_key(service, account);
-        let secret_prefix_key = format!("REDDIT_SECRET_{}", account.to_uppercase().replace(['-', ':', '.', '/'], "_"));
-        
+        let secret_prefix_key = format!(
+            "REDDIT_SECRET_{}",
+            account.to_uppercase().replace(['-', ':', '.', '/'], "_")
+        );
+
         if let Ok(val) = std::env::var(&primary_env_key) {
             return Ok(SecretToken::new(val));
         }

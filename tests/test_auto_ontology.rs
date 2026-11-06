@@ -1,9 +1,11 @@
-use std::sync::Arc;
 use serde_json::json;
+use std::sync::Arc;
 
 use reddit_agent::accounts::AccountManager;
 use reddit_agent::actions::ActionManager;
-use reddit_agent::agents::opportunity::{OpportunityWorker, ProductContext, RedditThread, ReviewStatus};
+use reddit_agent::agents::opportunity::{
+    OpportunityWorker, ProductContext, RedditThread, ReviewStatus,
+};
 use reddit_agent::audit::AuditLogger;
 use reddit_agent::auth::{AuthManager, MemoryKeyring};
 use reddit_agent::drivers::Capability;
@@ -108,7 +110,10 @@ async fn test_e2e_auto_ontology_lifecycle_and_gate_enforcement() {
     assert!(!ontology.relationships.is_empty());
 
     // Verify pain point detected
-    let has_wasting_hours = ontology.terms.iter().any(|t| t.term == "wasting hours" && t.category == TermCategory::PainPoint);
+    let has_wasting_hours = ontology
+        .terms
+        .iter()
+        .any(|t| t.term == "wasting hours" && t.category == TermCategory::PainPoint);
     assert!(has_wasting_hours);
 
     // 3. Human-in-the-Loop Certification: Add and activate a certified angle
@@ -124,10 +129,17 @@ async fn test_e2e_auto_ontology_lifecycle_and_gate_enforcement() {
     assert!(angle.active);
 
     // 4. Persist ontology & certified angle in Storage
-    storage.save_community_ontology(&ontology).expect("save ontology");
-    storage.save_certified_angle("vibecoding", &angle).expect("save angle");
+    storage
+        .save_community_ontology(&ontology)
+        .expect("save ontology");
+    storage
+        .save_certified_angle("vibecoding", &angle)
+        .expect("save angle");
 
-    let loaded_ont = storage.get_community_ontology("vibecoding").expect("query").expect("found");
+    let loaded_ont = storage
+        .get_community_ontology("vibecoding")
+        .expect("query")
+        .expect("found");
     assert_eq!(loaded_ont.subreddit, "vibecoding");
     assert_eq!(loaded_ont.certified_angles.len(), 1);
 
@@ -144,39 +156,66 @@ async fn test_e2e_auto_ontology_lifecycle_and_gate_enforcement() {
     };
 
     // Scenario A: Spam thread -> HighRiskViolation (Fail-closed, 0 API waste)
-    let verdict_spam = PreflightAnswerabilityGate::check_engagable(&threads[1], &loaded_ont, &product);
+    let verdict_spam =
+        PreflightAnswerabilityGate::check_engagable(&threads[1], &loaded_ont, &product);
     match verdict_spam {
-        EngagementVerdict::HighRiskViolation { rule_name, severity, detected_phrase } => {
+        EngagementVerdict::HighRiskViolation {
+            rule_name,
+            severity,
+            detected_phrase,
+        } => {
             assert_eq!(rule_name, "AntiSpamAndVoteManipulation");
             assert_eq!(severity, RuleSeverity::StrictBan);
             assert!(detected_phrase.contains("upvote for upvote"));
         }
-        other => panic!("Expected HighRiskViolation for spam thread, got {:?}", other),
+        other => panic!(
+            "Expected HighRiskViolation for spam thread, got {:?}",
+            other
+        ),
     }
 
     // Scenario B: Off-topic thread -> UnanswerableMissingConcepts
-    let verdict_offtopic = PreflightAnswerabilityGate::check_engagable(&threads[2], &loaded_ont, &product);
+    let verdict_offtopic =
+        PreflightAnswerabilityGate::check_engagable(&threads[2], &loaded_ont, &product);
     match verdict_offtopic {
-        EngagementVerdict::UnanswerableMissingConcepts { missing_concepts, .. } => {
+        EngagementVerdict::UnanswerableMissingConcepts {
+            missing_concepts, ..
+        } => {
             assert!(!missing_concepts.is_empty());
         }
-        other => panic!("Expected UnanswerableMissingConcepts for cooking thread, got {:?}", other),
+        other => panic!(
+            "Expected UnanswerableMissingConcepts for cooking thread, got {:?}",
+            other
+        ),
     }
 
     // Scenario C: High-signal thread -> CertifiedSafe
-    let verdict_safe = PreflightAnswerabilityGate::check_engagable(&threads[0], &loaded_ont, &product);
+    let verdict_safe =
+        PreflightAnswerabilityGate::check_engagable(&threads[0], &loaded_ont, &product);
     match verdict_safe {
-        EngagementVerdict::CertifiedSafe { angle: matched_angle, matched_terms, alignment_score } => {
+        EngagementVerdict::CertifiedSafe {
+            angle: matched_angle,
+            matched_terms,
+            alignment_score,
+        } => {
             assert_eq!(matched_angle.title, "Local-First Deterministic Engineering");
             assert!(matched_terms.contains(&"wasting hours".to_string()));
             assert!(alignment_score >= 0.5);
         }
-        other => panic!("Expected CertifiedSafe for high-signal thread, got {:?}", other),
+        other => panic!(
+            "Expected CertifiedSafe for high-signal thread, got {:?}",
+            other
+        ),
     }
 
     // 6. Test OpportunityWorker Integration with Preflight Ontology Gate
     let now_utc = 1700000500;
-    let ranked = OpportunityWorker::discover_opportunities_with_ontology(&threads, &product, &loaded_ont, now_utc);
+    let ranked = OpportunityWorker::discover_opportunities_with_ontology(
+        &threads,
+        &product,
+        &loaded_ont,
+        now_utc,
+    );
 
     // Spam thread and off-topic thread are automatically eliminated!
     assert_eq!(ranked.len(), 1);
@@ -186,8 +225,12 @@ async fn test_e2e_auto_ontology_lifecycle_and_gate_enforcement() {
     // 7. Verify Drafted Reply utilizes the Certified Angle
     let draft = OpportunityWorker::draft_reply(&ranked[0], &product).expect("draft reply");
     assert_eq!(draft.review_status, ReviewStatus::Approved);
-    assert!(draft.draft_text.contains("building local-first CLI tools in Rust"));
-    assert!(draft.draft_text.contains("Full disclosure: I am the author of reddit-agent"));
+    assert!(draft
+        .draft_text
+        .contains("building local-first CLI tools in Rust"));
+    assert!(draft
+        .draft_text
+        .contains("Full disclosure: I am the author of reddit-agent"));
     assert!(draft.experience_grammar_valid);
     assert!(draft.word_count >= 20 && draft.word_count <= 65);
 
@@ -199,28 +242,49 @@ async fn test_e2e_auto_ontology_lifecycle_and_gate_enforcement() {
     let driver = Arc::new(TestDummyDriver);
     let router = Arc::new(CapabilityRouter::new(driver.clone(), driver));
     let audit = Arc::new(AuditLogger::new(storage.clone()));
-    let action_mgr = Arc::new(ActionManager::new(storage.clone(), router.clone(), account_mgr.clone(), audit));
-    let issue_engine = Arc::new(IssueEngine::new(router.clone(), account_mgr.clone(), action_mgr.clone(), storage.clone(), "test_cid".to_string()));
+    let action_mgr = Arc::new(ActionManager::new(
+        storage.clone(),
+        router.clone(),
+        account_mgr.clone(),
+        audit,
+    ));
+    let issue_engine = Arc::new(IssueEngine::new(
+        router.clone(),
+        account_mgr.clone(),
+        action_mgr.clone(),
+        storage.clone(),
+        "test_cid".to_string(),
+    ));
 
-    let mcp = McpServer::new(account_mgr, router, action_mgr, issue_engine).with_storage(storage.clone());
+    let mcp =
+        McpServer::new(account_mgr, router, action_mgr, issue_engine).with_storage(storage.clone());
 
     // MCP: List ontologies
-    let mcp_list = mcp.handle_tool_call("reddit_ontology_list", json!({})).await.unwrap();
+    let mcp_list = mcp
+        .handle_tool_call("reddit_ontology_list", json!({}))
+        .await
+        .unwrap();
     assert_eq!(mcp_list, json!(["vibecoding"]));
 
     // MCP: Get ontology
-    let mcp_ont = mcp.handle_tool_call("reddit_ontology_get", json!({ "subreddit": "vibecoding" })).await.unwrap();
+    let mcp_ont = mcp
+        .handle_tool_call("reddit_ontology_get", json!({ "subreddit": "vibecoding" }))
+        .await
+        .unwrap();
     assert_eq!(mcp_ont["subreddit"], "vibecoding");
     assert_eq!(mcp_ont["certified_angles"].as_array().unwrap().len(), 1);
 
     // MCP: Check engagable
-    let mcp_check = mcp.handle_tool_call(
-        "reddit_ontology_check_engagable",
-        json!({
-            "subreddit": "vibecoding",
-            "title": "Cursor broken, looking for alternative to cursor that is wasting hours",
-            "pain_point": "wasting hours"
-        }),
-    ).await.unwrap();
+    let mcp_check = mcp
+        .handle_tool_call(
+            "reddit_ontology_check_engagable",
+            json!({
+                "subreddit": "vibecoding",
+                "title": "Cursor broken, looking for alternative to cursor that is wasting hours",
+                "pain_point": "wasting hours"
+            }),
+        )
+        .await
+        .unwrap();
     assert!(mcp_check.get("CertifiedSafe").is_some());
 }

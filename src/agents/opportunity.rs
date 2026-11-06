@@ -63,7 +63,10 @@ impl RedditThread {
         if !self.url.is_empty() {
             self.url.clone()
         } else {
-            format!("https://reddit.com/r/{}/comments/{}/", self.subreddit, self.id)
+            format!(
+                "https://reddit.com/r/{}/comments/{}/",
+                self.subreddit, self.id
+            )
         }
     }
 }
@@ -204,7 +207,10 @@ impl OpportunityWorker {
                 id: s.id.clone(),
                 subreddit: s.subreddit.clone(),
                 title: s.title.clone(),
-                body: s.full_body.clone().unwrap_or_else(|| s.body_snippet.clone()),
+                body: s
+                    .full_body
+                    .clone()
+                    .unwrap_or_else(|| s.body_snippet.clone()),
                 author: s.author.clone(),
                 created_utc: s.created_utc,
                 num_comments: s.num_comments,
@@ -423,10 +429,14 @@ impl OpportunityWorker {
                     // Drop off-topic threads that have no grounding in the community ontology
                     continue;
                 }
-                crate::ontology::EngagementVerdict::CertifiedSafe { alignment_score, .. } => {
+                crate::ontology::EngagementVerdict::CertifiedSafe {
+                    alignment_score, ..
+                } => {
                     // Boost product fit and composite score with certified grounding
-                    opp.product_fit_score = (opp.product_fit_score * (1.0 + *alignment_score as f64 * 0.25)).min(1.0);
-                    opp.composite_score = (opp.composite_score * (1.0 + *alignment_score as f64 * 0.2)).min(1.0);
+                    opp.product_fit_score =
+                        (opp.product_fit_score * (1.0 + *alignment_score as f64 * 0.25)).min(1.0);
+                    opp.composite_score =
+                        (opp.composite_score * (1.0 + *alignment_score as f64 * 0.2)).min(1.0);
                     opp.preflight_verdict = Some(verdict);
                     final_ranked.push(opp);
                 }
@@ -505,7 +515,11 @@ impl OpportunityWorker {
                 .contains(&OpportunitySignal::UrgentWorkflow))
             && opportunity.product_fit_score >= 0.65;
 
-        let (draft_text, review_status, product_named, affiliation_disclosed) = if let Some(crate::ontology::EngagementVerdict::CertifiedSafe { angle, .. }) = &opportunity.preflight_verdict {
+        let (draft_text, review_status, product_named, affiliation_disclosed) = if let Some(
+            crate::ontology::EngagementVerdict::CertifiedSafe { angle, .. },
+        ) =
+            &opportunity.preflight_verdict
+        {
             let disclosure = if !angle.mandatory_disclosure.is_empty() {
                 format!("{}, ", angle.mandatory_disclosure)
             } else {
@@ -706,15 +720,22 @@ mod tests {
         );
         assert_eq!(digger_res.total_sources, 1);
         assert_eq!(digger_res.sources[0].id, "d1");
-        assert_eq!(digger_res.sources[0].canonical_url, "https://reddit.com/r/SaaS/comments/d1/");
+        assert_eq!(
+            digger_res.sources[0].canonical_url,
+            "https://reddit.com/r/SaaS/comments/d1/"
+        );
 
         // 2. Miner analyzes content, intent signals, and ranks
         let miner_res = OpportunityWorker::mine_content(&digger_res.sources, &product, 1500);
         assert_eq!(miner_res.analyzed_count, 1);
         let opp = &miner_res.opportunities[0];
         assert_eq!(opp.thread.id, "d1");
-        assert!(opp.detected_signals.contains(&OpportunitySignal::RecommendationAsk));
-        assert!(opp.detected_signals.contains(&OpportunitySignal::CompetitorFrustration));
+        assert!(opp
+            .detected_signals
+            .contains(&OpportunitySignal::RecommendationAsk));
+        assert!(opp
+            .detected_signals
+            .contains(&OpportunitySignal::CompetitorFrustration));
         assert!(opp.composite_score > 0.70);
     }
 
@@ -726,7 +747,8 @@ mod tests {
                 id: "t_safe".to_string(),
                 subreddit: "SaaS".to_string(),
                 title: "Need recommendations for customer outreach tools".to_string(),
-                body: "Tired of wasting hours on Reddit outreach. Is there a safe tool?".to_string(),
+                body: "Tired of wasting hours on Reddit outreach. Is there a safe tool?"
+                    .to_string(),
                 author: "founder1".to_string(),
                 created_utc: 1200,
                 num_comments: 5,
@@ -770,7 +792,9 @@ mod tests {
             "certifier_1",
         );
 
-        let ranked = OpportunityWorker::discover_opportunities_with_ontology(&threads, &product, &ontology, 1500);
+        let ranked = OpportunityWorker::discover_opportunities_with_ontology(
+            &threads, &product, &ontology, 1500,
+        );
 
         // t_spam must be completely filtered out by HighRiskViolation preflight check
         assert_eq!(ranked.len(), 1);
@@ -782,7 +806,9 @@ mod tests {
 
         // Test drafted reply uses the certified angle
         let draft = OpportunityWorker::draft_reply(&ranked[0], &product).expect("draft");
-        assert!(draft.draft_text.contains("building an open-source local triage tool"));
+        assert!(draft
+            .draft_text
+            .contains("building an open-source local triage tool"));
         assert_eq!(draft.review_status, ReviewStatus::Approved);
     }
 }
