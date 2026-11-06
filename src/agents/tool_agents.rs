@@ -48,6 +48,12 @@ impl DiggerAgent {
     }
 }
 
+impl Default for DiggerAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl ToolAgent for DiggerAgent {
     fn name(&self) -> &'static str {
@@ -61,10 +67,7 @@ impl ToolAgent for DiggerAgent {
     }
 
     async fn execute(&self, ctx: &mut OrchestrationContext) -> Result<String, String> {
-        let product = ctx
-            .product
-            .clone()
-            .unwrap_or_else(|| ProductContext::default());
+        let product = ctx.product.clone().unwrap_or_default();
 
         ctx.execution_log.push(format!(
             "[{}] Mapping target subreddits: r/{}",
@@ -74,11 +77,7 @@ impl ToolAgent for DiggerAgent {
 
         let threads = self
             .driver
-            .discover_threads(
-                &product.target_subreddits,
-                &product.high_intent_phrases,
-                15,
-            )
+            .discover_threads(&product.target_subreddits, &product.high_intent_phrases, 15)
             .await;
 
         let digger_res = OpportunityWorker::dig_sources(
@@ -133,10 +132,7 @@ impl ToolAgent for MinerAgent {
             return Ok("0 sources mined".to_string());
         }
 
-        let product = ctx
-            .product
-            .clone()
-            .unwrap_or_else(|| ProductContext::default());
+        let product = ctx.product.clone().unwrap_or_default();
 
         ctx.execution_log.push(format!(
             "[{}] Mining {} candidate threads for intent signals and prompt sanitization...",
@@ -189,10 +185,7 @@ impl ToolAgent for DrafterAgent {
             return Ok("0 drafts generated".to_string());
         }
 
-        let product = ctx
-            .product
-            .clone()
-            .unwrap_or_else(|| ProductContext::default());
+        let product = ctx.product.clone().unwrap_or_default();
 
         let mut drafted = 0;
         // Draft for top opportunities

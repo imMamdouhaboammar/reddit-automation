@@ -31,7 +31,9 @@ async fn test_split_plane_router_dispatches_to_local_relay() {
     let verdict = router.validate_egress_safety(&plan);
     assert!(verdict.is_ok());
 
-    let payload = router.encode_relay_envelope(&plan).expect("encode envelope");
+    let payload = router
+        .encode_relay_envelope(&plan)
+        .expect("encode envelope");
     assert_eq!(payload["action_id"], "act_test_split_plane");
     assert_eq!(payload["egress_mode"], "split_plane_relay");
     assert_eq!(payload["target"], "t3_1xnhs2u");

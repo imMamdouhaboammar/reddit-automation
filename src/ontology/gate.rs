@@ -81,13 +81,16 @@ impl PreflightAnswerabilityGate {
         // Also check against certified angles' target pain points
         for angle in ontology.active_certified_angles() {
             let angle_pain = angle.target_pain_point.to_lowercase();
-            if text_lower.contains(&angle_pain) && !matched_pain_points.contains(&angle.target_pain_point) {
+            if text_lower.contains(&angle_pain)
+                && !matched_pain_points.contains(&angle.target_pain_point)
+            {
                 matched_pain_points.push(angle.target_pain_point.clone());
             }
         }
 
         // If the ontology has terms defined, but none matched the thread at all
-        if !ontology.terms.is_empty() && matched_terms.is_empty() && matched_pain_points.is_empty() {
+        if !ontology.terms.is_empty() && matched_terms.is_empty() && matched_pain_points.is_empty()
+        {
             return EngagementVerdict::UnanswerableMissingConcepts {
                 missing_concepts: vec![thread.title.clone()],
                 rationale: format!(
@@ -125,8 +128,9 @@ impl PreflightAnswerabilityGate {
             .into_iter()
             .find(|angle| {
                 let angle_pain = angle.target_pain_point.to_lowercase();
-                matched_pain_points.iter().any(|p| p.to_lowercase().contains(&angle_pain) || angle_pain.contains(&p.to_lowercase()))
-                    || text_lower.contains(&angle.target_pain_point.to_lowercase())
+                matched_pain_points.iter().any(|p| {
+                    p.to_lowercase().contains(&angle_pain) || angle_pain.contains(&p.to_lowercase())
+                }) || text_lower.contains(&angle.target_pain_point.to_lowercase())
             });
 
         if let Some(angle) = matching_angle {

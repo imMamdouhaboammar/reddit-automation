@@ -17,7 +17,5 @@ pub use opportunity::{
 pub use orchestrator::{MasterOrchestrator, OrchestrationReport};
 pub use reddit_2_skill::{GeneratedSkillPackage, Reddit2SkillEngine};
 pub use router::{DagStep, DagWave, DynamicRouter, ExecutionDag, IntentCategory};
-pub use tool_agents::{
-    DiggerAgent, DrafterAgent, MinerAgent, OrchestrationContext, ToolAgent,
-};
+pub use tool_agents::{DiggerAgent, DrafterAgent, MinerAgent, OrchestrationContext, ToolAgent};
 pub use velocity::{InteractionVerdict, VelocityGovernor};

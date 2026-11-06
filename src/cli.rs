@@ -6,7 +6,9 @@ use std::time::Duration;
 
 use crate::accounts::AccountManager;
 use crate::actions::{ActionManager, RiskLevel};
-use crate::agents::opportunity::{OpportunityWorker, ProductContext, RankedOpportunity, RedditThread};
+use crate::agents::opportunity::{
+    OpportunityWorker, ProductContext, RankedOpportunity, RedditThread,
+};
 use crate::audit::AuditLogger;
 use crate::auth::AuthManager;
 use crate::drivers::browser::BrowserDriver;
@@ -139,9 +141,16 @@ pub enum OntologySubcommand {
     Generate {
         #[arg(long, short, help = "Subreddit name (e.g. 'vibecoding', 'SaaS')")]
         subreddit: String,
-        #[arg(long, default_value = "Community domain knowledge", help = "Description of the community")]
+        #[arg(
+            long,
+            default_value = "Community domain knowledge",
+            help = "Description of the community"
+        )]
         description: String,
-        #[arg(long, help = "Path to optional JSON file containing RedditThread items")]
+        #[arg(
+            long,
+            help = "Path to optional JSON file containing RedditThread items"
+        )]
         threads_file: Option<PathBuf>,
     },
     /// Inspect terms, rules, and relationships for a community ontology
@@ -168,9 +177,17 @@ pub enum OntologySubcommand {
         pitch: String,
         #[arg(long, help = "Target pain point or keyword")]
         pain_point: String,
-        #[arg(long, default_value = "Full disclosure: I am working on this tool", help = "Mandatory affiliation disclosure")]
+        #[arg(
+            long,
+            default_value = "Full disclosure: I am working on this tool",
+            help = "Mandatory affiliation disclosure"
+        )]
         disclosure: String,
-        #[arg(long, default_value = "cli_user", help = "Name of the human reviewer certifying this angle")]
+        #[arg(
+            long,
+            default_value = "cli_user",
+            help = "Name of the human reviewer certifying this angle"
+        )]
         certified_by: String,
     },
     /// List all subreddits with stored community ontologies
@@ -258,9 +275,7 @@ pub enum AccountSubcommand {
         timeout_secs: u64,
     },
     /// Inspect session cookies stored in OS Keychain
-    Cookies {
-        alias: String,
-    },
+    Cookies { alias: String },
     /// Interactive account takeover with custom starting URL
     Takeover {
         alias: String,
@@ -691,7 +706,10 @@ impl AppContext {
                     timeout_secs,
                 } => {
                     let ctx = self.account_manager.get_account_context(Some(&alias))?;
-                    println!("Initiating Obscura account takeover for alias '{}'...", alias);
+                    println!(
+                        "Initiating Obscura account takeover for alias '{}'...",
+                        alias
+                    );
                     let result = self
                         .browser_driver
                         .takeover_account(&ctx, url.as_deref(), Duration::from_secs(timeout_secs))
@@ -736,14 +754,8 @@ impl AppContext {
                         );
                     }
 
-                    let username = val["username"]
-                        .as_str()
-                        .unwrap_or("unknown")
-                        .to_string();
-                    let raw_cookies = val["cookies"]
-                        .as_array()
-                        .cloned()
-                        .unwrap_or_default();
+                    let username = val["username"].as_str().unwrap_or("unknown").to_string();
+                    let raw_cookies = val["cookies"].as_array().cloned().unwrap_or_default();
                     let mut session_cookies = Vec::new();
 
                     for c in raw_cookies {
@@ -768,8 +780,7 @@ impl AppContext {
                         cookies: session_cookies,
                     };
 
-                    self.browser_driver
-                        .save_cookies_to_keychain(&alias, &jar)?;
+                    self.browser_driver.save_cookies_to_keychain(&alias, &jar)?;
                     self.account_manager
                         .link_identity(&ctx.account.id, &username, &[])?;
                     self.storage
@@ -1137,10 +1148,7 @@ impl AppContext {
                 BrowserSubcommand::Snapshot { alias, url, headed } => {
                     let target_alias = alias.as_deref().or(account_override);
                     let ctx = self.account_manager.get_account_context(target_alias)?;
-                    println!(
-                        "Browsing {} with natural human behavior simulation...",
-                        url
-                    );
+                    println!("Browsing {} with natural human behavior simulation...", url);
                     let snapshot = self
                         .browser_driver
                         .human_browse(&ctx, &url, !headed)
@@ -1170,15 +1178,22 @@ impl AppContext {
                     format,
                 } => {
                     let queries = if query.is_empty() {
-                        vec!["recommendation".to_string(), "tool".to_string(), "alternative".to_string()]
+                        vec![
+                            "recommendation".to_string(),
+                            "tool".to_string(),
+                            "alternative".to_string(),
+                        ]
                     } else {
                         vec![query]
                     };
 
                     println!("⛏️ Running reddit-digger on r/{}...", subreddit);
                     let keyless = RedditKeylessDriver::new();
-                    let threads = keyless.discover_threads(&[subreddit.clone()], &queries, limit).await;
-                    let digger_result = OpportunityWorker::dig_sources(&threads, &[subreddit], &queries);
+                    let threads = keyless
+                        .discover_threads(std::slice::from_ref(&subreddit), &queries, limit)
+                        .await;
+                    let digger_result =
+                        OpportunityWorker::dig_sources(&threads, &[subreddit], &queries);
 
                     match format.to_lowercase().as_str() {
                         "json" => println!("{}", serde_json::to_string_pretty(&digger_result)?),
@@ -1223,29 +1238,38 @@ impl AppContext {
                             "alternative".to_string(),
                             "what tool".to_string(),
                         ],
-                        affiliation_disclosure: "Full disclosure: I am affiliated with this tool".to_string(),
+                        affiliation_disclosure: "Full disclosure: I am affiliated with this tool"
+                            .to_string(),
                     };
 
                     println!("🔬 Running reddit-miner on r/{}...", subreddit);
                     let keyless = RedditKeylessDriver::new();
                     let threads = keyless
-                        .discover_threads(&[subreddit.clone()], &product_ctx.high_intent_phrases, limit)
+                        .discover_threads(
+                            std::slice::from_ref(&subreddit),
+                            &product_ctx.high_intent_phrases,
+                            limit,
+                        )
                         .await;
 
                     let digger_res = OpportunityWorker::dig_sources(
                         &threads,
-                        &[subreddit.clone()],
+                        std::slice::from_ref(&subreddit),
                         &product_ctx.high_intent_phrases,
                     );
                     let now = chrono::Utc::now().timestamp();
-                    let miner_res = OpportunityWorker::mine_content(&digger_res.sources, &product_ctx, now);
+                    let miner_res =
+                        OpportunityWorker::mine_content(&digger_res.sources, &product_ctx, now);
 
                     let ranked = miner_res.opportunities;
                     let formatted_output = match format.to_lowercase().as_str() {
                         "json" => serde_json::to_string_pretty(&ranked)?,
                         "md" | "markdown" => {
                             let mut md = String::new();
-                            md.push_str(&format!("# Mined Reddit Opportunities: r/{}\n\n", subreddit));
+                            md.push_str(&format!(
+                                "# Mined Reddit Opportunities: r/{}\n\n",
+                                subreddit
+                            ));
                             md.push_str(&format!(
                                 "*Analyzed {} threads, identified {} high-intent opportunities for `{}`*\n\n",
                                 miner_res.analyzed_count,
@@ -1275,7 +1299,8 @@ impl AppContext {
                             md
                         }
                         _ => {
-                            let mut text = format!("\nMined {} ranked opportunities:\n\n", ranked.len());
+                            let mut text =
+                                format!("\nMined {} ranked opportunities:\n\n", ranked.len());
                             for (i, opp) in ranked.iter().take(10).enumerate() {
                                 text.push_str(&format!(
                                     "{}. [Score: {:.2}] {} (r/{})\n   URL:     {}\n   Why:     {}\n   Signals: {:?} | Comments: {}\n\n",
@@ -1332,18 +1357,15 @@ impl AppContext {
                     let keyless = RedditKeylessDriver::new();
                     let threads = keyless
                         .discover_threads(
-                            &[subreddit.clone()],
+                            std::slice::from_ref(&subreddit),
                             &product_ctx.high_intent_phrases,
                             limit,
                         )
                         .await;
 
                     let now = chrono::Utc::now().timestamp();
-                    let ranked = OpportunityWorker::discover_opportunities(
-                        &threads,
-                        &product_ctx,
-                        now,
-                    );
+                    let ranked =
+                        OpportunityWorker::discover_opportunities(&threads, &product_ctx, now);
 
                     let formatted_output = match format.to_lowercase().as_str() {
                         "json" => serde_json::to_string_pretty(&ranked)?,
@@ -1378,7 +1400,10 @@ impl AppContext {
                             md.push_str("\n## Detailed Breakdown\n\n");
                             for (i, opp) in ranked.iter().take(10).enumerate() {
                                 md.push_str(&format!("### {}. {}\n\n", i + 1, opp.thread.title));
-                                md.push_str(&format!("- **URL:** {}\n", opp.thread.canonical_url()));
+                                md.push_str(&format!(
+                                    "- **URL:** {}\n",
+                                    opp.thread.canonical_url()
+                                ));
                                 md.push_str(&format!(
                                     "- **Opportunity Reason:** {}\n",
                                     opp.opportunity_reason
@@ -1434,7 +1459,8 @@ impl AppContext {
                         num_comments: 5,
                         is_locked: false,
                         is_archived: false,
-                        url: "https://reddit.com/r/community/comments/cli_draft_target/".to_string(),
+                        url: "https://reddit.com/r/community/comments/cli_draft_target/"
+                            .to_string(),
                     };
 
                     let sample_product = ProductContext {
@@ -1454,20 +1480,31 @@ impl AppContext {
                         product_fit_score: 0.80,
                         timing_score: 0.85,
                         composite_score: 0.85,
-                        detected_signals: vec![crate::agents::opportunity::OpportunitySignal::RecommendationAsk],
+                        detected_signals: vec![
+                            crate::agents::opportunity::OpportunitySignal::RecommendationAsk,
+                        ],
                         opportunity_reason: "OP is looking for assistance".to_string(),
                         preflight_verdict: None,
                     };
 
                     match OpportunityWorker::draft_reply(&sample_opp, &sample_product) {
                         Ok(draft) => {
-                            println!("\n=== Experience Grammar Draft (Words: {}) ===", draft.word_count);
+                            println!(
+                                "\n=== Experience Grammar Draft (Words: {}) ===",
+                                draft.word_count
+                            );
                             println!("{}", draft.draft_text);
                             println!("\nChecks passed:");
-                            println!("- Experience grammar valid: {}", draft.experience_grammar_valid);
+                            println!(
+                                "- Experience grammar valid: {}",
+                                draft.experience_grammar_valid
+                            );
                             println!("- Product named:           {}", draft.product_named);
                             println!("- Affiliation disclosed:   {}", draft.affiliation_disclosed);
-                            println!("- Referenced detail:       '{}'", draft.concrete_detail_referenced);
+                            println!(
+                                "- Referenced detail:       '{}'",
+                                draft.concrete_detail_referenced
+                            );
                         }
                         Err(err) => {
                             eprintln!("Draft generation failed: {}", err);
@@ -1484,14 +1521,28 @@ impl AppContext {
                     println!("🧭 === OmniSkill Dynamic Agent Router ===");
                     println!("Prompt:      '{}'", dag.user_prompt);
                     println!("Language:    {}", dag.detected_language);
-                    println!("Intent:      {:?} (Confidence: {:.2})", dag.intent_category, dag.confidence_score);
-                    println!("\nExecution Waves ({} waves, {} total steps):", dag.execution_waves.len(), dag.steps.len());
+                    println!(
+                        "Intent:      {:?} (Confidence: {:.2})",
+                        dag.intent_category, dag.confidence_score
+                    );
+                    println!(
+                        "\nExecution Waves ({} waves, {} total steps):",
+                        dag.execution_waves.len(),
+                        dag.steps.len()
+                    );
                     for wave in &dag.execution_waves {
                         println!("  [Wave {}]", wave.wave_index + 1);
                         for sid in &wave.step_ids {
                             if let Some(step) = dag.steps.iter().find(|s| &s.step_id == sid) {
-                                let approval_str = if step.requires_human_approval { " ⚠️ [APPROVAL REQUIRED]" } else { "" };
-                                println!("    • {} -> Tool: `{}`{}", step.agent_role, step.tool_name, approval_str);
+                                let approval_str = if step.requires_human_approval {
+                                    " ⚠️ [APPROVAL REQUIRED]"
+                                } else {
+                                    ""
+                                };
+                                println!(
+                                    "    • {} -> Tool: `{}`{}",
+                                    step.agent_role, step.tool_name, approval_str
+                                );
                                 println!("      {}", step.description);
                             }
                         }
@@ -1513,7 +1564,11 @@ impl AppContext {
                 println!("🎭 Launching Master Orchestrator for: '{}'...", prompt);
                 let product_ctx = product.map(|name| {
                     let subs = subreddits
-                        .map(|s| s.split(',').map(|i| i.trim().trim_start_matches("r/").to_string()).collect())
+                        .map(|s| {
+                            s.split(',')
+                                .map(|i| i.trim().trim_start_matches("r/").to_string())
+                                .collect()
+                        })
                         .unwrap_or_else(|| vec!["SaaS".to_string(), "startups".to_string()]);
                     ProductContext {
                         product_name: name.clone(),
@@ -1522,17 +1577,28 @@ impl AppContext {
                         pain_points: vec!["manual effort".to_string(), "time waste".to_string()],
                         competitors: vec![],
                         target_subreddits: subs,
-                        high_intent_phrases: vec!["recommendation".to_string(), "alternative".to_string()],
+                        high_intent_phrases: vec![
+                            "recommendation".to_string(),
+                            "alternative".to_string(),
+                        ],
                         affiliation_disclosure: format!("Full disclosure: I work on {}", name),
                     }
                 });
 
                 let orchestrator = crate::agents::orchestrator::MasterOrchestrator::new();
-                let report = orchestrator.orchestrate_from_prompt(&prompt, product_ctx).await
+                let report = orchestrator
+                    .orchestrate_from_prompt(&prompt, product_ctx)
+                    .await
                     .map_err(|e| anyhow::anyhow!(e))?;
 
-                println!("\n✅ Workflow Completed: [{}] (Status: {})", report.workflow_id, report.status);
-                println!("- Completed Steps: {}/{}", report.steps_completed, report.total_steps);
+                println!(
+                    "\n✅ Workflow Completed: [{}] (Status: {})",
+                    report.workflow_id, report.status
+                );
+                println!(
+                    "- Completed Steps: {}/{}",
+                    report.steps_completed, report.total_steps
+                );
                 println!("- Context Summary: {}", report.context_summary);
 
                 println!("\nExecution Log:");
@@ -1563,16 +1629,24 @@ impl AppContext {
                     .await
                     .map_err(|e| anyhow::anyhow!(e))?;
 
-                println!("\n✅ Successfully forged Agent Skill: '{}'", package.skill_name);
+                println!(
+                    "\n✅ Successfully forged Agent Skill: '{}'",
+                    package.skill_name
+                );
                 println!("- Display Name:       {}", package.display_name);
-                println!("- Target Subreddits:  r/{}", package.target_subreddits.join(", r/"));
+                println!(
+                    "- Target Subreddits:  r/{}",
+                    package.target_subreddits.join(", r/")
+                );
                 println!("- Analyzed Threads:   {}", package.analyzed_threads_count);
                 println!(
                     "- Output Directory:   {}",
                     output_dir.join(&package.skill_name).display()
                 );
                 println!("\nStructure created:");
-                println!("  ├── SKILL.md                 (AgentSkills.io v1 & Poteto Mode standard)");
+                println!(
+                    "  ├── SKILL.md                 (AgentSkills.io v1 & Poteto Mode standard)"
+                );
                 println!("  ├── scripts/preflight_check.py");
                 println!("  └── references/reddit_evidence.md");
             }
@@ -1587,10 +1661,12 @@ impl AppContext {
                     println!("🧠 Mining community ontology for r/{}...", sub_clean);
 
                     let threads: Vec<RedditThread> = if let Some(path) = threads_file {
-                        let content = std::fs::read_to_string(&path)
-                            .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", path.display(), e))?;
-                        serde_json::from_str(&content)
-                            .map_err(|e| anyhow::anyhow!("Failed to parse {}: {}", path.display(), e))?
+                        let content = std::fs::read_to_string(&path).map_err(|e| {
+                            anyhow::anyhow!("Failed to read {}: {}", path.display(), e)
+                        })?;
+                        serde_json::from_str(&content).map_err(|e| {
+                            anyhow::anyhow!("Failed to parse {}: {}", path.display(), e)
+                        })?
                     } else {
                         println!("📡 Fetching public threads via keyless driver...");
                         let keyless = RedditKeylessDriver::new();
@@ -1609,10 +1685,14 @@ impl AppContext {
                         &threads,
                     );
 
-                    self.storage.save_community_ontology(&ontology)
+                    self.storage
+                        .save_community_ontology(&ontology)
                         .map_err(|e| anyhow::anyhow!("Storage error: {}", e))?;
 
-                    println!("✅ Successfully compiled and persisted Community Ontology for r/{}", sub_clean);
+                    println!(
+                        "✅ Successfully compiled and persisted Community Ontology for r/{}",
+                        sub_clean
+                    );
                     println!("- Discovered Terms:   {}", ontology.terms.len());
                     println!("- Default Rules:      {}", ontology.rules.len());
                     println!("- Relationships:      {}", ontology.relationships.len());
@@ -1623,21 +1703,35 @@ impl AppContext {
                     let sub_clean = subreddit.trim_start_matches("r/").to_string();
                     match self.storage.get_community_ontology(&sub_clean)? {
                         Some(ont) => {
-                            println!("\n=== Community Ontology: r/{} (v{}) ===", ont.subreddit, ont.version);
+                            println!(
+                                "\n=== Community Ontology: r/{} (v{}) ===",
+                                ont.subreddit, ont.version
+                            );
                             println!("Description: {}", ont.description);
                             println!("Updated:     {}\n", ont.updated_at);
 
                             println!("--- Rules & Constraints ({}) ---", ont.rules.len());
                             for rule in &ont.rules {
-                                println!("* [{:?}] {}: {}", rule.severity, rule.rule_name, rule.description);
+                                println!(
+                                    "* [{:?}] {}: {}",
+                                    rule.severity, rule.rule_name, rule.description
+                                );
                                 if !rule.forbidden_phrases.is_empty() {
                                     println!("  Forbidden: {}", rule.forbidden_phrases.join(", "));
                                 }
                             }
 
-                            println!("\n--- Certified Angles ({}) ---", ont.certified_angles.len());
+                            println!(
+                                "\n--- Certified Angles ({}) ---",
+                                ont.certified_angles.len()
+                            );
                             for angle in &ont.certified_angles {
-                                println!("* [{}] {} (By: {})", if angle.active { "ACTIVE" } else { "INACTIVE" }, angle.title, angle.certified_by);
+                                println!(
+                                    "* [{}] {} (By: {})",
+                                    if angle.active { "ACTIVE" } else { "INACTIVE" },
+                                    angle.title,
+                                    angle.certified_by
+                                );
                                 println!("  Target Pain: {}", angle.target_pain_point);
                                 println!("  Pitch:       {}", angle.angle_pitch);
                                 println!("  Disclosure:  {}", angle.mandatory_disclosure);
@@ -1645,8 +1739,13 @@ impl AppContext {
 
                             println!("\n--- Sample Community Terms ({}) ---", ont.terms.len());
                             for term in ont.terms.iter().take(15) {
-                                println!("* [{:?}] {} (Freq: {}, Sentiment: {:.2}, Certified: {})",
-                                    term.category, term.term, term.frequency, term.sentiment_bias, term.certified
+                                println!(
+                                    "* [{:?}] {} (Freq: {}, Sentiment: {:.2}, Certified: {})",
+                                    term.category,
+                                    term.term,
+                                    term.frequency,
+                                    term.sentiment_bias,
+                                    term.certified
                                 );
                             }
                         }
@@ -1662,7 +1761,9 @@ impl AppContext {
                     body,
                 } => {
                     let sub_clean = subreddit.trim_start_matches("r/").to_string();
-                    let ontology = self.storage.get_community_ontology(&sub_clean)?
+                    let ontology = self
+                        .storage
+                        .get_community_ontology(&sub_clean)?
                         .unwrap_or_else(|| {
                             crate::ontology::AutoOntologyBuilder::build_from_threads(
                                 &sub_clean,
@@ -1686,14 +1787,16 @@ impl AppContext {
 
                     let context = ProductContext::default();
                     let verdict = crate::ontology::PreflightAnswerabilityGate::check_engagable(
-                        &thread,
-                        &ontology,
-                        &context,
+                        &thread, &ontology, &context,
                     );
 
                     println!("\n=== Preflight Answerability Check ===");
                     match verdict {
-                        crate::ontology::EngagementVerdict::CertifiedSafe { angle, matched_terms, alignment_score } => {
+                        crate::ontology::EngagementVerdict::CertifiedSafe {
+                            angle,
+                            matched_terms,
+                            alignment_score,
+                        } => {
                             println!("Verdict: ✅ CERTIFIED SAFE");
                             println!("Alignment Score: {:.2}", alignment_score);
                             println!("Matched Terms:   {}", matched_terms.join(", "));
@@ -1701,18 +1804,28 @@ impl AppContext {
                             println!("Approved Pitch:  {}", angle.angle_pitch);
                             println!("Disclosure:      {}", angle.mandatory_disclosure);
                         }
-                        crate::ontology::EngagementVerdict::HighRiskViolation { rule_name, detected_phrase, severity } => {
+                        crate::ontology::EngagementVerdict::HighRiskViolation {
+                            rule_name,
+                            detected_phrase,
+                            severity,
+                        } => {
                             println!("Verdict: ❌ HIGH RISK VIOLATION (FAIL-CLOSED)");
                             println!("Rule:            {}", rule_name);
                             println!("Severity:        {:?}", severity);
                             println!("Detected Phrase: '{}'", detected_phrase);
                         }
-                        crate::ontology::EngagementVerdict::UnanswerableMissingConcepts { missing_concepts, rationale } => {
+                        crate::ontology::EngagementVerdict::UnanswerableMissingConcepts {
+                            missing_concepts,
+                            rationale,
+                        } => {
                             println!("Verdict: ⚠️ UNANSWERABLE / OUT OF SCOPE");
                             println!("Rationale:       {}", rationale);
                             println!("Missing Concepts: {}", missing_concepts.join(", "));
                         }
-                        crate::ontology::EngagementVerdict::UncertifiedAngleRequired { detected_pain_point, suggested_pitch } => {
+                        crate::ontology::EngagementVerdict::UncertifiedAngleRequired {
+                            detected_pain_point,
+                            suggested_pitch,
+                        } => {
                             println!("Verdict: 🛑 UNCERTIFIED ANGLE REQUIRED");
                             println!("Detected Pain:   {}", detected_pain_point);
                             println!("Suggested Pitch: {}", suggested_pitch);
@@ -1741,10 +1854,13 @@ impl AppContext {
                         active: true,
                     };
 
-                    self.storage.save_certified_angle(&sub_clean, &angle)
+                    self.storage
+                        .save_certified_angle(&sub_clean, &angle)
                         .map_err(|e| anyhow::anyhow!("Failed to save angle: {}", e))?;
 
-                    let mut ont = self.storage.get_community_ontology(&sub_clean)?
+                    let mut ont = self
+                        .storage
+                        .get_community_ontology(&sub_clean)?
                         .unwrap_or_else(|| {
                             crate::ontology::AutoOntologyBuilder::build_from_threads(
                                 &sub_clean,
@@ -1753,19 +1869,28 @@ impl AppContext {
                             )
                         });
                     ont.certified_angles.push(angle.clone());
-                    self.storage.save_community_ontology(&ont)
+                    self.storage
+                        .save_community_ontology(&ont)
                         .map_err(|e| anyhow::anyhow!("Failed to update ontology: {}", e))?;
 
-                    println!("✅ Certified and activated angle '{}' for r/{}", angle.title, sub_clean);
+                    println!(
+                        "✅ Certified and activated angle '{}' for r/{}",
+                        angle.title, sub_clean
+                    );
                     println!("- ID:         {}", angle.id);
                     println!("- Target:     {}", angle.target_pain_point);
                     println!("- Pitch:      {}", angle.angle_pitch);
                     println!("- Disclosure: {}", angle.mandatory_disclosure);
-                    println!("- Certified:  {} at {}", angle.certified_by, angle.certified_at);
+                    println!(
+                        "- Certified:  {} at {}",
+                        angle.certified_by, angle.certified_at
+                    );
                 }
 
                 OntologySubcommand::List => {
-                    let subs = self.storage.list_community_ontologies()
+                    let subs = self
+                        .storage
+                        .list_community_ontologies()
                         .map_err(|e| anyhow::anyhow!("Storage error: {}", e))?;
                     println!("\n=== Stored Community Ontologies ({}) ===", subs.len());
                     if subs.is_empty() {
@@ -1773,8 +1898,12 @@ impl AppContext {
                     } else {
                         for sub in subs {
                             if let Ok(Some(ont)) = self.storage.get_community_ontology(&sub) {
-                                println!("* r/{} — Terms: {}, Rules: {}, Certified Angles: {}",
-                                    ont.subreddit, ont.terms.len(), ont.rules.len(), ont.certified_angles.len()
+                                println!(
+                                    "* r/{} — Terms: {}, Rules: {}, Certified Angles: {}",
+                                    ont.subreddit,
+                                    ont.terms.len(),
+                                    ont.rules.len(),
+                                    ont.certified_angles.len()
                                 );
                             } else {
                                 println!("* r/{}", sub);
@@ -1782,7 +1911,7 @@ impl AppContext {
                         }
                     }
                 }
-            }
+            },
 
             Commands::Mcp => {
                 let server = McpServer::new(

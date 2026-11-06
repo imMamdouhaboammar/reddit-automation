@@ -92,7 +92,8 @@ impl MasterOrchestrator {
                         status: "pending_human_approval".to_string(),
                         steps_completed,
                         total_steps,
-                        context_summary: "Workflow paused at cryptographic action approval gate.".to_string(),
+                        context_summary: "Workflow paused at cryptographic action approval gate."
+                            .to_string(),
                         execution_log: context.execution_log,
                         result: serde_json::json!({
                             "paused_at_step": step.step_id,
@@ -148,6 +149,12 @@ impl MasterOrchestrator {
             execution_log: context.execution_log,
             result: deliverable,
         })
+    }
+}
+
+impl Default for MasterOrchestrator {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

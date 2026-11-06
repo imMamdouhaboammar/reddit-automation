@@ -233,13 +233,20 @@ impl AuthManager {
 
     pub fn get_cookies(&self, alias: &str) -> Result<SecretToken, AuthError> {
         self.credential_store
-            .get_secret(Self::keyring_service(), &Self::keyring_cookies_account(alias))
-            .map_err(|e| AuthError::Keyring(format!("No cookies found for account '{}': {}", alias, e)))
+            .get_secret(
+                Self::keyring_service(),
+                &Self::keyring_cookies_account(alias),
+            )
+            .map_err(|e| {
+                AuthError::Keyring(format!("No cookies found for account '{}': {}", alias, e))
+            })
     }
 
     pub fn delete_cookies(&self, alias: &str) -> Result<(), AuthError> {
-        self.credential_store
-            .delete_secret(Self::keyring_service(), &Self::keyring_cookies_account(alias))
+        self.credential_store.delete_secret(
+            Self::keyring_service(),
+            &Self::keyring_cookies_account(alias),
+        )
     }
 
     pub fn generate_authorize_url(

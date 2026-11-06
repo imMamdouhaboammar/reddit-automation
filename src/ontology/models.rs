@@ -112,8 +112,7 @@ impl CommunityOntology {
     pub fn find_term(&self, query: &str) -> Option<&CommunityTerm> {
         let lower = query.to_lowercase();
         self.terms.iter().find(|t| {
-            t.term.to_lowercase() == lower
-                || t.synonyms.iter().any(|s| s.to_lowercase() == lower)
+            t.term.to_lowercase() == lower || t.synonyms.iter().any(|s| s.to_lowercase() == lower)
         })
     }
 

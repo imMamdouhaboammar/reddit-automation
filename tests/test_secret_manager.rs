@@ -7,7 +7,11 @@ fn test_headless_credential_store_fallback_and_memory() {
 
     // Set a secret in headless mode
     store
-        .set_secret("reddit-agent", "browser_cookies:mamdouh", "cookie_data_test")
+        .set_secret(
+            "reddit-agent",
+            "browser_cookies:mamdouh",
+            "cookie_data_test",
+        )
         .expect("set secret");
 
     let retrieved = store
@@ -19,7 +23,10 @@ fn test_headless_credential_store_fallback_and_memory() {
 
 #[test]
 fn test_headless_env_secret_provider() {
-    std::env::set_var("REDDIT_SECRET_BROWSER_COOKIES_MAMDOUH", "env_injected_cookie_json");
+    std::env::set_var(
+        "REDDIT_SECRET_BROWSER_COOKIES_MAMDOUH",
+        "env_injected_cookie_json",
+    );
     let store = GcpSecretManagerStore::new_with_memory_fallback();
 
     let retrieved = store
